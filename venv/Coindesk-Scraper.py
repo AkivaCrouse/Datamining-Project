@@ -1,31 +1,97 @@
 import requests
 import time
+import textwrap as tw
+import argparse
+import sys
+from tabulate import tabulate
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common import keys
+from datetime import datetime
 
 
 PATH = "C:\Program Files (x86)\chromedriver.exe"
 ARTICLE_LINK_INDEX = 1
-WEB_PAGE_HOME = "https://www.coindesk.com"
-URL="https://www.coindesk.com/category/tech"
-MORE_CLICKS = 3
+URL = "https://www.coindesk.com"
+TAGS = 0
+DATETIME = 1
+REQUIRED_NUM_OF_ARGS = 3
+ARG_OPTION = 1
+MAX_ARTICLES = 100
+ARTICLES_PER_HOME = 9
+ARTICLES_PER_PAGE = 12
+DEFAULT_PREFIX = '/category/'
 
 
-def get_html(url):
+def welcome():
+    """
+    Gets the section and number of articles required by the user, with argparser,
+    and outputs the relevant URL suffix for these articles together with the number of articles.
+    the program also response to the flag -h for help.
+    :return:    section: relevant section URL suffix.
+                num_articles: number of articles requested by the user
+    """
+
+    # Overriding error function in order to display the help message
+    # whenever the error method is triggered, for UX purposes.
+    class MyParser(argparse.ArgumentParser):
+        """
+        Overriding the 'error' function in ArgumentParser in order to display the help message
+        whenever the error method is triggered, for UX purposes.
+        """
+
+        def error(self, message):
+            sys.stderr.write('error: %s\n' % message)
+            self.print_help()
+            sys.exit(2)
+
+    section_dict = {
+        'tech': DEFAULT_PREFIX + 'tech',
+        'business': DEFAULT_PREFIX + 'business',
+        'people': DEFAULT_PREFIX + 'people',
+        'policy-regulation': DEFAULT_PREFIX + 'policy-regulation',
+        'features': '/features',
+        'markets': '/markets',
+        'opinion': '/opinion',
+        'latest': '/news',
+    }
+    coindesk_reader = MyParser(add_help=False)
+    coindesk_reader.add_argument('section', type=str.lower, metavar='section',
+                                 help='We have the following sections: latest, tech, business, regulation, people, '
+                                      'features, opinion, markets.',
+                                 choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
+    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles', help='Number of articles, from 1 to 100',
+                                 choices=list(range(1, MAX_ARTICLES+1)))
+    args = coindesk_reader.parse_args()
+    section = args.section
+    num_articles = int(args.num_articles)
+
+    if section == 'regulation':
+        section = 'policy-regulation'
+
+    return section_dict[section], num_articles
+
+
+def get_html(url, num_articles):
     """Receives the url to coindesk.com.
     Opens the url using Chrome driver.
     Clicks on the 'MORE' button several times.
     Returns the page source code as html,"""
     browser = webdriver.Chrome(PATH)
     browser.get(url)
-    for click_more in range(MORE_CLICKS):
+    scrolls = (num_articles - ARTICLES_PER_HOME)//ARTICLES_PER_PAGE + 1
+    for click_more in range(scrolls):
         more_button = browser.find_element_by_class_name('cta-story-stack')
         more_button.click()
         time.sleep(3)
     html = browser.page_source
-    # browser.close()
     return html
+
+
+def get_link(article_html):
+    """Gets the block of html for each article and returns the url to the article"""
+    links = [link.get('href') for link in article_html.find_all('a')]
+    return URL + links[ARTICLE_LINK_INDEX]
 
 
 def get_tags(article_link):
@@ -43,32 +109,56 @@ def get_tags(article_link):
     return tags
 
 
-def scrape(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    counter = 0
-    for article in soup.find_all('div', class_='text-content'):
-        heading = article.h4.text
-        authors = [author.get_text() for author in article.find_all('span', class_='credit')]  # may have multiple Authors
-        date_and_time = article.time.text
-        summary = article.p.text
+def article_scrape(article_link):
+    """
+    Receives a url to an article.
+    Retrieves the url source code as html.
+    Scrapes and returns the articles topic tags.
+    :param article_link: str
+    :return: list of strings
+    """
+    sub_r = requests.get(article_link)
+    sub_soup = BeautifulSoup(sub_r.content, 'html.parser')
+    tags_tag = sub_soup.find('div', class_='tags')
+    tags = [tag.get_text() for tag in tags_tag.find_all('a')]
+    datetime = sub_soup.find('time').get('datetime')
+    return tags, datetime
 
-        links = [link.get('href') for link in article.find_all('a')]
-        article_link = WEB_PAGE_HOME + links[ARTICLE_LINK_INDEX]
-        tags = get_tags(article_link)
-        print("Heading:", heading)
-        print("Summary: ", summary)
-        print("Author:", authors)
-        print("Link:", article_link)
-        print("Tags:", tags)
-        print("Time: ", date_and_time)
-        counter += 1
-        print("Count:", counter)
-        print()
+
+def scrape(html, num_articles):
+    """
+    Receives html script and number of articles to print.
+    Parses the html and prints the following subjects per article for the number of articles requested:
+        Title, Summary, Author, Link, Tags and Date-Time
+    :param html: html string
+    :param num_articles: int
+    """
+    soup = BeautifulSoup(html, 'html.parser')
+    count = 0
+    for article in soup.find_all('div', class_='text-content'):
+        count += 1
+        article_number = ['#', count]
+        table = [
+            ['Title', article.h4.text],
+            ['Summary', '\n'.join(tw.wrap(article.p.text, width=90))],
+            ['Author', ', '.join([author.get_text() for author in article.find_all('span', class_='credit')])],
+            ['Link', get_link(article)],
+            ['Tags', ', '.join(article_scrape(get_link(article))[TAGS])],
+            ['Date-Time', article_scrape(get_link(article))[DATETIME]]
+        ]
+        print('\n', tabulate(table, article_number, tablefmt='plain'))
+        if count == num_articles:
+            break
 
 
 def main():
-    html = get_html(URL)
-    scrape(html)
+    """Receives Coindesk topic section and number of articles to print as command parameters.
+    Uses selenium to retrieve the required html script.
+    Scrapes and prints each article for the following data:
+        Title, Summary, Author, Link, Tags and Date-Time"""
+    section, num_arts = welcome()
+    html = get_html(URL+section, num_arts)
+    scrape(html, num_arts)
 
 
 if __name__ == '__main__':
