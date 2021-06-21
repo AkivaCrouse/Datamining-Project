@@ -18,7 +18,6 @@ Beautiful Soup is a Python package for parsing HTML and XML documents. It create
 Selenium - 
 Selenium WebDriver is a collection of open source APIs which are used to automate the testing of a web application. We used it to automate the CoinDesk website navigation and make scraping faster.
 
-https://chromedriver.chromium.org/downloads
 
 ## Run Locally
 
