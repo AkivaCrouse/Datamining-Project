@@ -1,3 +1,12 @@
+######################################################################################################################
+"""
+Title: Coindesk.com Scraper
+Authors: Akiva Crouse & Ohad Ben Tzvi
+Date: 23/06/2021
+"""
+######################################################################################################################
+
+
 import requests
 import time
 import textwrap as tw
@@ -7,6 +16,9 @@ from tabulate import tabulate
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common import keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 
 
@@ -17,10 +29,11 @@ TAGS = 0
 DATETIME = 1
 REQUIRED_NUM_OF_ARGS = 3
 ARG_OPTION = 1
-MAX_ARTICLES = 100
+MAX_ARTICLES = 1000
 ARTICLES_PER_HOME = 9
 ARTICLES_PER_PAGE = 12
 DEFAULT_PREFIX = '/category/'
+SLEEPTIME = 3
 
 
 def welcome():
@@ -49,7 +62,7 @@ def welcome():
         'tech': DEFAULT_PREFIX + 'tech',
         'business': DEFAULT_PREFIX + 'business',
         'people': DEFAULT_PREFIX + 'people',
-        'policy-regulation': DEFAULT_PREFIX + 'policy-regulation',
+        'regulation': DEFAULT_PREFIX + 'policy-regulation',
         'features': '/features',
         'markets': '/markets',
         'opinion': '/opinion',
@@ -57,17 +70,14 @@ def welcome():
     }
     coindesk_reader = MyParser(add_help=False)
     coindesk_reader.add_argument('section', type=str.lower, metavar='section',
-                                 help='We have the following sections: latest, tech, business, regulation, people, '
+                                 help='Choose one of the following sections: latest, tech, business, regulation, people, '
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
-    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles', help='Number of articles, from 1 to 100',
+    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles', help=f'Number of articles, from 1 to {MAX_ARTICLES}',
                                  choices=list(range(1, MAX_ARTICLES+1)))
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
-
-    if section == 'regulation':
-        section = 'policy-regulation'
 
     return section_dict[section], num_articles
 
@@ -81,9 +91,19 @@ def get_html(url, num_articles):
     browser.get(url)
     scrolls = (num_articles - ARTICLES_PER_HOME)//ARTICLES_PER_PAGE + 1
     for click_more in range(scrolls):
-        more_button = browser.find_element_by_class_name('cta-story-stack')
+        try:
+            more_button = WebDriverWait(browser, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
+
+        except Exception:
+            print("Articles did not load in time due to network.")
+            browser.close()
+            sys.exit(1)
+
         more_button.click()
-        time.sleep(3)
+        time.sleep(SLEEPTIME)
+
+
     html = browser.page_source
     return html
 
