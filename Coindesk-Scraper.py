@@ -7,20 +7,18 @@ Date: 23/06/2021
 ######################################################################################################################
 
 
-import requests
-import time
-import textwrap as tw
 import argparse
 import sys
-from tabulate import tabulate
+import textwrap as tw
+import time
+
+import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
-from selenium.webdriver.common import keys
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
-
+from selenium.webdriver.support.ui import WebDriverWait
+from tabulate import tabulate
 
 # PATH = "C:\Program Files (x86)\chromedriver.exe"
 ARTICLE_LINK_INDEX = 1
@@ -103,7 +101,6 @@ def get_html(url, num_articles):
 
         more_button.click()
         time.sleep(SLEEPTIME)
-
 
     html = browser.page_source
     return html

@@ -31,12 +31,6 @@ Clone the project
   git clone https://github.com/AkivaCrouse/Datamining-Project.git
 ```
 
-Go to the project directory
-
-```bash
-  cd venv
-```
-
 Install dependencies
 
 ```bash
