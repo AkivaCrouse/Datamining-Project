@@ -22,7 +22,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 
 
-PATH = "C:\Program Files (x86)\chromedriver.exe"
+# PATH = "C:\Program Files (x86)\chromedriver.exe"
 ARTICLE_LINK_INDEX = 1
 URL = "https://www.coindesk.com"
 TAGS = 0
@@ -87,7 +87,8 @@ def get_html(url, num_articles):
     Opens the url using Chrome driver.
     Clicks on the 'MORE' button several times.
     Returns the page source code as html,"""
-    browser = webdriver.Chrome(PATH)
+    # browser = webdriver.Chrome(PATH)
+    browser = webdriver.Chrome()
     browser.get(url)
     scrolls = (num_articles - ARTICLES_PER_HOME)//ARTICLES_PER_PAGE + 1
     for click_more in range(scrolls):
