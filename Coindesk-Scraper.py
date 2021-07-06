@@ -11,7 +11,7 @@ import argparse
 import sys
 import textwrap as tw
 import time
-
+import config as CFG
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -20,18 +20,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tabulate import tabulate
 
-# PATH = "C:\Program Files (x86)\chromedriver.exe"
-ARTICLE_LINK_INDEX = 1
-URL = "https://www.coindesk.com"
-TAGS = 0
-DATETIME = 1
-REQUIRED_NUM_OF_ARGS = 3
-ARG_OPTION = 1
-MAX_ARTICLES = 1000
-ARTICLES_PER_HOME = 9
-ARTICLES_PER_PAGE = 12
-DEFAULT_PREFIX = '/category/'
-SLEEPTIME = 3
+
+
+
 
 
 def welcome():
@@ -57,10 +48,10 @@ def welcome():
             sys.exit(2)
 
     section_dict = {
-        'tech': DEFAULT_PREFIX + 'tech',
-        'business': DEFAULT_PREFIX + 'business',
-        'people': DEFAULT_PREFIX + 'people',
-        'regulation': DEFAULT_PREFIX + 'policy-regulation',
+        'tech': CFG.DEFAULT_PREFIX + 'tech',
+        'business': CFG.DEFAULT_PREFIX + 'business',
+        'people': CFG.DEFAULT_PREFIX + 'people',
+        'regulation': CFG.DEFAULT_PREFIX + 'policy-regulation',
         'features': '/features',
         'markets': '/markets',
         'opinion': '/opinion',
@@ -71,8 +62,9 @@ def welcome():
                                  help='Choose one of the following sections: latest, tech, business, regulation, people, '
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
-    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles', help=f'Number of articles, from 1 to {MAX_ARTICLES}',
-                                 choices=list(range(1, MAX_ARTICLES+1)))
+    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
+                                 help=f'Number of articles, from 1 to {CFG.MAX_ARTICLES}',
+                                 choices=list(range(1, CFG.MAX_ARTICLES+1)))
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
@@ -85,10 +77,10 @@ def get_html(url, num_articles):
     Opens the url using Chrome driver.
     Clicks on the 'MORE' button several times.
     Returns the page source code as html,"""
-    # browser = webdriver.Chrome(PATH)
+    # browser = webdriver.Chrome(CFG.PATH)
     browser = webdriver.Chrome()
     browser.get(url)
-    scrolls = (num_articles - ARTICLES_PER_HOME)//ARTICLES_PER_PAGE + 1
+    scrolls = (num_articles - CFG.ARTICLES_PER_HOME)//CFG.ARTICLES_PER_PAGE + 1
     for click_more in range(scrolls):
         try:
             more_button = WebDriverWait(browser, 10).until(
@@ -100,7 +92,7 @@ def get_html(url, num_articles):
             sys.exit(1)
 
         more_button.click()
-        time.sleep(SLEEPTIME)
+        time.sleep(CFG.SLEEPTIME)
 
     html = browser.page_source
     return html
@@ -109,7 +101,7 @@ def get_html(url, num_articles):
 def get_link(article_html):
     """Gets the block of html for each article and returns the url to the article"""
     links = [link.get('href') for link in article_html.find_all('a')]
-    return URL + links[ARTICLE_LINK_INDEX]
+    return CFG.URL + links[CFG.ARTICLE_LINK_INDEX]
 
 
 def get_tags(article_link):
@@ -161,8 +153,8 @@ def scrape(html, num_articles):
             ['Summary', '\n'.join(tw.wrap(article.p.text, width=90))],
             ['Author', ', '.join([author.get_text() for author in article.find_all('span', class_='credit')])],
             ['Link', get_link(article)],
-            ['Tags', ', '.join(article_scrape(get_link(article))[TAGS])],
-            ['Date-Time', article_scrape(get_link(article))[DATETIME]]
+            ['Tags', ', '.join(article_scrape(get_link(article))[CFG.TAGS])],
+            ['Date-Time', article_scrape(get_link(article))[CFG.DATETIME]]
         ]
         print('\n', tabulate(table, article_number, tablefmt='plain'))
         if count == num_articles:
@@ -175,7 +167,7 @@ def main():
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     section, num_arts = welcome()
-    html = get_html(URL+section, num_arts)
+    html = get_html(CFG.URL+section, num_arts)
     scrape(html, num_arts)
 
 
