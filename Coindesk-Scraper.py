@@ -6,12 +6,13 @@ Date: 23/06/2021
 """
 ######################################################################################################################
 
-
+import pymysql
 import argparse
 import sys
 import textwrap as tw
 import time
-import config as CFG
+import datetime
+from config import *
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -19,6 +20,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tabulate import tabulate
+import tqdm
 
 
 class Article:
@@ -64,7 +66,7 @@ class Article:
         self.summary = article_html.p.text
         self.author = [author.get_text() for author in article_html.find_all('span', class_='credit')]
         links = [link.get('href') for link in article_html.find_all('a')]
-        self.link = CFG.URL + links[CFG.ARTICLE_LINK_INDEX]
+        self.link = URL + links[ARTICLE_LINK_INDEX]
         self.tags = None
         self.date_published = None
         self.set_tags_and_date()
@@ -81,7 +83,7 @@ class Article:
             ['Link', self.link],
             ['Tags', ', '.join(self.tags)],
             ['Date-Time', self.date_published]
-            ],
+        ],
             headers=['#', self.article_id],
             tablefmt='plain')
 
@@ -132,10 +134,10 @@ def welcome():
             sys.exit(2)
 
     section_dict = {
-        'tech': CFG.DEFAULT_PREFIX + 'tech',
-        'business': CFG.DEFAULT_PREFIX + 'business',
-        'people': CFG.DEFAULT_PREFIX + 'people',
-        'regulation': CFG.DEFAULT_PREFIX + 'policy-regulation',
+        'tech': DEFAULT_PREFIX + 'tech',
+        'business': DEFAULT_PREFIX + 'business',
+        'people': DEFAULT_PREFIX + 'people',
+        'regulation': DEFAULT_PREFIX + 'policy-regulation',
         'features': '/features',
         'markets': '/markets',
         'opinion': '/opinion',
@@ -147,8 +149,8 @@ def welcome():
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
     coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
-                                 help=f'Number of articles, from 1 to {CFG.MAX_ARTICLES}',
-                                 choices=list(range(1, CFG.MAX_ARTICLES+1)))
+                                 help=f'Number of articles, from 1 to {MAX_ARTICLES}',
+                                 choices=list(range(1, MAX_ARTICLES + 1)))
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
@@ -163,7 +165,7 @@ def get_html(url, num_articles):
     Returns the page source code as html,"""
     browser = webdriver.Chrome()
     browser.get(url)
-    scrolls = (num_articles - CFG.ARTICLES_PER_HOME)//CFG.ARTICLES_PER_PAGE + 1
+    scrolls = (num_articles - ARTICLES_PER_HOME) // ARTICLES_PER_PAGE + 1
     for click_more in range(scrolls):
         try:
             more_button = WebDriverWait(browser, 10).until(
@@ -175,7 +177,7 @@ def get_html(url, num_articles):
             sys.exit(1)
 
         more_button.click()
-        time.sleep(CFG.SLEEPTIME)
+        time.sleep(SLEEPTIME)
 
     html = browser.page_source
     return html
@@ -191,20 +193,46 @@ def parse_article_html(html):
     return [article_html for article_html in soup.find_all('div', class_='text-content')]
 
 
+def insert_data(article, host, user, password, database):
+    with pymysql.connect(host=host, user=user, password=password, database=database,
+                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+        with connection_instance.cursor() as cursor:
+            sql = f'''INSERT INTO {SUMMARIES_TABLE} (summary) 
+                VALUES ("{article}")'''
+            cursor.execute(sql)
+            summary_id = cursor.lastrowid
+            print(datetime.datetime.strptime(article.date_published,"%Y-%m-%dT%H:%M:%S"))
+            sql = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
+                VALUES ("{article.name}",
+                {summary_id},
+                {datetime.datetime.strptime(article.date_published,"%Y-%m-%dT%H:%M:%S")},
+                {article.link})'''
+            cursor.execute(sql)
+            article_id = cursor.lastrowid
+            for author in article.author:
+                cursor.execute(f'SELECT id FROM {AUTHORS_TABLE} WHERE name = {author}')
+                print(cursor.fetchone())
+            sql = f'DELETE FROM {SUMMARIES_TABLE}'
+            cursor.execute(sql)
+    # article_sql = [f"""INSERT INTO {ARTICLES_TABLE} (title, publication_date, url, category_id, summary_id)
+    # """]
+
+
 def main():
     """Receives Coindesk topic section and number of articles to print as command parameters.
     Uses selenium to retrieve the required html script.
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     section, num_arts = welcome()
-    html = get_html(CFG.URL + section, num_arts)
+    html = get_html(URL + section, num_arts)
     article_html_list = parse_article_html(html)
-    articles = [Article(article_html) for article_html in article_html_list]
-    for article in articles:
-        # article.set_tags_and_date(article.get_link())
-        print(article, "\n")
-        if article.get_article_id() == num_arts:
-            break
+    articles = [Article(article_html) for article_html in tqdm.tqdm(article_html_list)]
+    # for article in articles:
+    #     # article.set_tags_and_date(article.get_link())
+    #     print(article, "\n")
+    #     if article.get_article_id() == num_arts:
+    #         break
+    insert_data(articles[0],HOST,USER,'Dungeon!995',DATABASE)
 
 
 if __name__ == '__main__':
