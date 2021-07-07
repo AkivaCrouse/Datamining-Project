@@ -67,6 +67,7 @@ class Article:
         self.link = CFG.URL + links[CFG.ARTICLE_LINK_INDEX]
         self.tags = None
         self.date_published = None
+        self.set_tags_and_date()
 
     def __str__(self):
         """
@@ -84,7 +85,7 @@ class Article:
             headers=['#', self.article_id],
             tablefmt='plain')
 
-    def set_tags_and_date(self, article_link):
+    def set_tags_and_date(self):
         """
         Receives a url to an article.
         Retrieves the url source code as html.
@@ -92,6 +93,7 @@ class Article:
         :param article_link: str
         :return: list of strings
         """
+        article_link = self.link
         sub_r = requests.get(article_link)
         sub_soup = BeautifulSoup(sub_r.content, 'html.parser')
         tags_tag = sub_soup.find('div', class_='tags')
@@ -199,7 +201,7 @@ def main():
     article_html_list = parse_article_html(html)
     articles = [Article(article_html) for article_html in article_html_list]
     for article in articles:
-        article.set_tags_and_date(article.get_link())
+        # article.set_tags_and_date(article.get_link())
         print(article, "\n")
         if article.get_article_id() == num_arts:
             break
