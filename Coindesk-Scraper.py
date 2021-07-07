@@ -5,13 +5,13 @@ Authors: Akiva Crouse & Ohad Ben Tzvi
 Date: 23/06/2021
 """
 ######################################################################################################################
-
-
+import pymysql
 import argparse
 import sys
 import textwrap as tw
 import time
-
+import datetime
+from config import *
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -19,19 +19,95 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tabulate import tabulate
+import tqdm
 
-# PATH = "C:\Program Files (x86)\chromedriver.exe"
-ARTICLE_LINK_INDEX = 1
-URL = "https://www.coindesk.com"
-TAGS = 0
-DATETIME = 1
-REQUIRED_NUM_OF_ARGS = 3
-ARG_OPTION = 1
-MAX_ARTICLES = 1000
-ARTICLES_PER_HOME = 9
-ARTICLES_PER_PAGE = 12
-DEFAULT_PREFIX = '/category/'
-SLEEPTIME = 3
+
+class Article:
+    """
+        A class to represent an article.
+
+        Attributes
+        ----------
+        article_id : int
+            Number article instance created.
+        name: str
+            Article title.
+        summary: str
+            Article summary.
+        author: str or list of strings
+            Article author(s).
+        link: str
+            Link to article webpage (url).
+        tags: list of str
+            Article hashtags.
+        date_published: datetime
+            Date and time article was published.
+        Methods
+        -------
+        set_tags_and_date(article_link):
+            Receives the article url and sets the tags and date published
+        get_link():
+            Returns article link (str)
+        get_article_id(self):
+            Returns article id (int)
+        """
+    article_id = 0
+
+    def __init__(self, article_html):
+        """
+        Constructs all necessary attributes of the vehicle object.
+        :param article_html: article related html parsed from the main html.
+        """
+        Article.article_id += 1
+        self.article_html = article_html
+        self.article_id = Article.article_id
+        self.name = article_html.h4.text
+        self.summary = article_html.p.text
+        self.author = [author.get_text() for author in article_html.find_all('span', class_='credit')]
+        links = [link.get('href') for link in article_html.find_all('a')]
+        self.link = URL + links[ARTICLE_LINK_INDEX]
+        self.tags = None
+        self.date_published = None
+        self.set_tags_and_date()
+
+    def __str__(self):
+        """
+        Constructs a table when print is called on the article.
+        :return: table
+        """
+        return tabulate(tabular_data=[
+            ['Title', self.name],
+            ['Summary', '\n'.join(tw.wrap(self.summary, width=90))],
+            ['Author', ', '.join(self.author)],
+            ['Link', self.link],
+            ['Tags', ', '.join(self.tags)],
+            ['Date-Time', self.date_published]
+        ],
+            headers=['#', self.article_id],
+            tablefmt='plain')
+
+    def set_tags_and_date(self):
+        """
+        Receives a url to an article.
+        Retrieves the url source code as html.
+        Scrapes and returns the articles topic tags and datetime of publication.
+        :param article_link: str
+        :return: list of strings
+        """
+        article_link = self.link
+        sub_r = requests.get(article_link)
+        sub_soup = BeautifulSoup(sub_r.content, 'html.parser')
+        tags_tag = sub_soup.find('div', class_='tags')
+        self.tags = [tag.get_text() for tag in tags_tag.find_all('a')]
+        self.date_published = sub_soup.find('time').get('datetime')
+
+    def get_link(self):
+        """Returns url (str) to article webpage"""
+        return self.link
+
+    def get_article_id(self):
+        """Returns article id (int)"""
+        return self.article_id
 
 
 def welcome():
@@ -71,8 +147,9 @@ def welcome():
                                  help='Choose one of the following sections: latest, tech, business, regulation, people, '
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
-    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles', help=f'Number of articles, from 1 to {MAX_ARTICLES}',
-                                 choices=list(range(1, MAX_ARTICLES+1)))
+    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
+                                 help=f'Number of articles, from 1 to {MAX_ARTICLES}',
+                                 choices=list(range(1, MAX_ARTICLES + 1)))
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
@@ -85,10 +162,9 @@ def get_html(url, num_articles):
     Opens the url using Chrome driver.
     Clicks on the 'MORE' button several times.
     Returns the page source code as html,"""
-    # browser = webdriver.Chrome(PATH)
     browser = webdriver.Chrome()
     browser.get(url)
-    scrolls = (num_articles - ARTICLES_PER_HOME)//ARTICLES_PER_PAGE + 1
+    scrolls = (num_articles - ARTICLES_PER_HOME) // ARTICLES_PER_PAGE + 1
     for click_more in range(scrolls):
         try:
             more_button = WebDriverWait(browser, 10).until(
@@ -106,67 +182,72 @@ def get_html(url, num_articles):
     return html
 
 
-def get_link(article_html):
-    """Gets the block of html for each article and returns the url to the article"""
-    links = [link.get('href') for link in article_html.find_all('a')]
-    return URL + links[ARTICLE_LINK_INDEX]
-
-
-def get_tags(article_link):
+def parse_article_html(html):
     """
-    Receives a url to an article.
-    Retrieves the url source code as html.
-    Scrapes and returns the articles topic tags.
-    :param article_link: str
-    :return: list of strings
-    """
-    sub_r = requests.get(article_link)
-    sub_soup = BeautifulSoup(sub_r.content, 'html.parser')
-    tags_tag = sub_soup.find('div', class_='tags')
-    tags = [tag.get_text() for tag in tags_tag.find_all('a')]
-    return tags
-
-
-def article_scrape(article_link):
-    """
-    Receives a url to an article.
-    Retrieves the url source code as html.
-    Scrapes and returns the articles topic tags.
-    :param article_link: str
-    :return: list of strings
-    """
-    sub_r = requests.get(article_link)
-    sub_soup = BeautifulSoup(sub_r.content, 'html.parser')
-    tags_tag = sub_soup.find('div', class_='tags')
-    tags = [tag.get_text() for tag in tags_tag.find_all('a')]
-    datetime = sub_soup.find('time').get('datetime')
-    return tags, datetime
-
-
-def scrape(html, num_articles):
-    """
-    Receives html script and number of articles to print.
-    Parses the html and prints the following subjects per article for the number of articles requested:
-        Title, Summary, Author, Link, Tags and Date-Time
-    :param html: html string
-    :param num_articles: int
+    Parses each article html from main url html.
+    :param html: the main page html (str)
+    :return: list of html strings for each article
     """
     soup = BeautifulSoup(html, 'html.parser')
-    count = 0
-    for article in soup.find_all('div', class_='text-content'):
-        count += 1
-        article_number = ['#', count]
-        table = [
-            ['Title', article.h4.text],
-            ['Summary', '\n'.join(tw.wrap(article.p.text, width=90))],
-            ['Author', ', '.join([author.get_text() for author in article.find_all('span', class_='credit')])],
-            ['Link', get_link(article)],
-            ['Tags', ', '.join(article_scrape(get_link(article))[TAGS])],
-            ['Date-Time', article_scrape(get_link(article))[DATETIME]]
-        ]
-        print('\n', tabulate(table, article_number, tablefmt='plain'))
-        if count == num_articles:
-            break
+    return [article_html for article_html in soup.find_all('div', class_='text-content')]
+
+
+def insert_batch(articles, batch_size, host, user, password, database):
+    with pymysql.connect(host=host, user=user, password=password, database=database,
+                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+        count = 0
+        for a in articles:
+            insert_data(a, connection_instance)
+            count += 1
+            if count == batch_size:
+                connection_instance.commit()
+                count = 0
+        connection_instance.commit()
+
+
+def insert_data(article, conn):
+    with conn.cursor() as cursor:
+        sql = f'''INSERT INTO {SUMMARIES_TABLE} (summary) 
+            VALUES (%s)'''
+        cursor.execute(sql, article.summary)
+        summary_id = cursor.lastrowid
+        sql = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
+            VALUES (%s, %s, %s, %s)'''
+        cursor.execute(sql, [article.name, summary_id,
+                             datetime.datetime.strptime(article.date_published, "%Y-%m-%dT%H:%M:%S"), article.link])
+
+        article_id = cursor.lastrowid
+        for author in article.author:
+            cursor.execute(f'SELECT id FROM {AUTHORS_TABLE} WHERE name = "{author}"')
+            result = cursor.fetchone()
+            if result is None:
+                cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("{author}")')
+                author_id = cursor.lastrowid
+            else:
+                author_id = result['id']
+            cursor.execute(f'INSERT INTO {AUTHORS_ARTICLES_TABLE} VALUES ({article_id},{author_id})')
+
+        for tag in article.tags:
+            cursor.execute(f'SELECT id FROM {TAGS_TABLE} WHERE name = "{tag}"')
+            result = cursor.fetchone()
+            if result is None:
+                cursor.execute(f'INSERT INTO {TAGS_TABLE} (name) VALUES ("{tag}")')
+                tag_id = cursor.lastrowid
+            else:
+                tag_id = result['id']
+            cursor.execute(f'INSERT INTO {TAGS_ARTICLES_TABLE} VALUES ({article_id},{tag_id})')
+    # cursor.execute(f'SELECT * FROM {ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {AUTHORS_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {AUTHORS_ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {TAGS_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {TAGS_ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {SUMMARIES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
 
 
 def main():
@@ -175,8 +256,11 @@ def main():
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     section, num_arts = welcome()
-    html = get_html(URL+section, num_arts)
-    scrape(html, num_arts)
+    html = get_html(URL + section, num_arts)
+    article_html_list = parse_article_html(html)
+    articles = [Article(article_html) for article_html in tqdm.tqdm(article_html_list)]
+
+    insert_batch(articles, BATCH_SIZE, HOST, USER, 'Dungeon!995', DATABASE)
 
 
 if __name__ == '__main__':
