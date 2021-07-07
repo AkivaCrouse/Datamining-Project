@@ -3,44 +3,44 @@ import argparse
 import pandas as pd
 from config import *
 
-AUTHORS_TABLE = """CREATE TABLE IF NOT EXISTS Authors (id INT AUTO_INCREMENT PRIMARY KEY,
+AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(40)
             )
             """
-SUMMARIES_TABLE = """CREATE TABLE IF NOT EXISTS Summaries (id INT AUTO_INCREMENT PRIMARY KEY,
+SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
             summary TEXT
             )
             """
-CATEGORIES_TABLE = """CREATE TABLE IF NOT EXISTS Categories (id INT AUTO_INCREMENT PRIMARY KEY,
+CATEGORIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
             category VARCHAR(20)
             )
             """
-TAGS_TABLE = """CREATE TABLE IF NOT EXISTS Tags (id INT AUTO_INCREMENT PRIMARY KEY,
+TAGS_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(20)
             )
             """
-ARTICLES_TABLE = """CREATE TABLE IF NOT EXISTS Articles (id INT AUTO_INCREMENT PRIMARY KEY,
+ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
             title varchar(25),
             publication_date DATETIME,
             url TEXT,
             category_id INT,
             summary_id INT UNIQUE,
-            FOREIGN KEY(category_id) REFERENCES Categories(id),
-            FOREIGN KEY(summary_id) REFERENCES Summaries(id)
+            FOREIGN KEY(category_id) REFERENCES {CATEGORIES_TABLE}(id),
+            FOREIGN KEY(summary_id) REFERENCES {SUMMARIES_TABLE}(id)
             )
             """
-TAGS_ARTICLES_RELATIONSHIP_TABLE = """CREATE TABLE IF NOT EXISTS Tags_in_articles (
+TAGS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_ARTICLES_TABLE} (
             article_id INT,
             tag_id INT,
-            FOREIGN KEY(article_id) REFERENCES Articles(id),
-            FOREIGN KEY(tag_id) REFERENCES Tags(id)
+            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
+            FOREIGN KEY(tag_id) REFERENCES {TAGS_TABLE}(id)
             )
             """
-AUTHORS_ARTICLES_RELATIONSHIP_TABLE = """CREATE TABLE IF NOT EXISTS Authors_in_articles (
+AUTHORS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_ARTICLES_TABLE} (
             article_id INT,
             author_id INT,
-            FOREIGN KEY(article_id) REFERENCES Articles(id),
-            FOREIGN KEY(author_id) REFERENCES Authors(id)
+            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
+            FOREIGN KEY(author_id) REFERENCES {AUTHORS_TABLE}(id)
             )
             """
 
@@ -53,13 +53,13 @@ def initialize_database(user, password, host, database):
             use_database = 'USE ' + database
             cursor_instance.execute(create_database)
             cursor_instance.execute(use_database)
-            cursor_instance.execute(AUTHORS_TABLE)
-            cursor_instance.execute(SUMMARIES_TABLE)
-            cursor_instance.execute(CATEGORIES_TABLE)
-            cursor_instance.execute(TAGS_TABLE)
-            cursor_instance.execute(ARTICLES_TABLE)
-            cursor_instance.execute(TAGS_ARTICLES_RELATIONSHIP_TABLE)
-            cursor_instance.execute(AUTHORS_ARTICLES_RELATIONSHIP_TABLE)
+            cursor_instance.execute(AUTHORS_CREATION)
+            cursor_instance.execute(SUMMARIES_CREATION)
+            cursor_instance.execute(CATEGORIES_CREATION)
+            cursor_instance.execute(TAGS_CREATION)
+            cursor_instance.execute(ARTICLES_CREATION)
+            cursor_instance.execute(TAGS_ARTICLES_RELATIONSHIP_CREATION)
+            cursor_instance.execute(AUTHORS_ARTICLES_RELATIONSHIP_CREATION)
 
 
 def show_and_describe_tables(user, password, host, database):
