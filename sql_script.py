@@ -4,7 +4,7 @@ import pandas as pd
 from config import *
 
 AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(40)
+            name VARCHAR(100)
             )
             """
 SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
@@ -12,16 +12,16 @@ SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AU
             )
             """
 CATEGORIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            category VARCHAR(20)
+            category VARCHAR(100)
             )
             """
 TAGS_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(20)
+            name VARCHAR(100)
             )
             """
 ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            title varchar(25),
-            publication_date DATETIME,
+            title varchar(200),
+            publication_date TIMESTAMP,
             url TEXT,
             category_id INT,
             summary_id INT UNIQUE NOT NULL,
@@ -72,6 +72,8 @@ def show_and_describe_tables(user, password, host, database):
             for r in results:
                 print(r, ':')
                 cursor.execute('DESCRIBE ' + r)
+                print(pd.DataFrame(cursor.fetchall()), '\n')
+                cursor.execute(f'SELECT * FROM {r}')
                 print(pd.DataFrame(cursor.fetchall()), '\n')
 
 

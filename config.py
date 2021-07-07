@@ -14,6 +14,7 @@ AUTHORS_ARTICLES_TABLE = 'Authors_in_articles'
 
 # PATH = "C:\Program Files (x86)\chromedriver.exe"
 ARTICLE_LINK_INDEX = 1
+BATCH_SIZE = 10
 URL = "https://www.coindesk.com"
 TAGS = 0
 DATETIME = 1

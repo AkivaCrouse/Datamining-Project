@@ -5,7 +5,6 @@ Authors: Akiva Crouse & Ohad Ben Tzvi
 Date: 23/06/2021
 """
 ######################################################################################################################
-
 import pymysql
 import argparse
 import sys
@@ -193,29 +192,62 @@ def parse_article_html(html):
     return [article_html for article_html in soup.find_all('div', class_='text-content')]
 
 
-def insert_data(article, host, user, password, database):
+def insert_batch(articles, batch_size, host, user, password, database):
     with pymysql.connect(host=host, user=user, password=password, database=database,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
-        with connection_instance.cursor() as cursor:
-            sql = f'''INSERT INTO {SUMMARIES_TABLE} (summary) 
-                VALUES ("{article}")'''
-            cursor.execute(sql)
-            summary_id = cursor.lastrowid
-            print(datetime.datetime.strptime(article.date_published,"%Y-%m-%dT%H:%M:%S"))
-            sql = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
-                VALUES ("{article.name}",
-                {summary_id},
-                {datetime.datetime.strptime(article.date_published,"%Y-%m-%dT%H:%M:%S")},
-                {article.link})'''
-            cursor.execute(sql)
-            article_id = cursor.lastrowid
-            for author in article.author:
-                cursor.execute(f'SELECT id FROM {AUTHORS_TABLE} WHERE name = {author}')
-                print(cursor.fetchone())
-            sql = f'DELETE FROM {SUMMARIES_TABLE}'
-            cursor.execute(sql)
-    # article_sql = [f"""INSERT INTO {ARTICLES_TABLE} (title, publication_date, url, category_id, summary_id)
-    # """]
+        count = 0
+        for a in articles:
+            insert_data(a, connection_instance)
+            count += 1
+            if count == batch_size:
+                connection_instance.commit()
+                count = 0
+        connection_instance.commit()
+
+
+def insert_data(article, conn):
+    with conn.cursor() as cursor:
+        sql = f'''INSERT INTO {SUMMARIES_TABLE} (summary) 
+            VALUES (%s)'''
+        cursor.execute(sql, article.summary)
+        summary_id = cursor.lastrowid
+        sql = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
+            VALUES (%s, %s, %s, %s)'''
+        cursor.execute(sql, [article.name, summary_id,
+                             datetime.datetime.strptime(article.date_published, "%Y-%m-%dT%H:%M:%S"), article.link])
+
+        article_id = cursor.lastrowid
+        for author in article.author:
+            cursor.execute(f'SELECT id FROM {AUTHORS_TABLE} WHERE name = "{author}"')
+            result = cursor.fetchone()
+            if result is None:
+                cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("{author}")')
+                author_id = cursor.lastrowid
+            else:
+                author_id = result['id']
+            cursor.execute(f'INSERT INTO {AUTHORS_ARTICLES_TABLE} VALUES ({article_id},{author_id})')
+
+        for tag in article.tags:
+            cursor.execute(f'SELECT id FROM {TAGS_TABLE} WHERE name = "{tag}"')
+            result = cursor.fetchone()
+            if result is None:
+                cursor.execute(f'INSERT INTO {TAGS_TABLE} (name) VALUES ("{tag}")')
+                tag_id = cursor.lastrowid
+            else:
+                tag_id = result['id']
+            cursor.execute(f'INSERT INTO {TAGS_ARTICLES_TABLE} VALUES ({article_id},{tag_id})')
+    # cursor.execute(f'SELECT * FROM {ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {AUTHORS_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {AUTHORS_ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {TAGS_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {TAGS_ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {SUMMARIES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
 
 
 def main():
@@ -227,12 +259,8 @@ def main():
     html = get_html(URL + section, num_arts)
     article_html_list = parse_article_html(html)
     articles = [Article(article_html) for article_html in tqdm.tqdm(article_html_list)]
-    # for article in articles:
-    #     # article.set_tags_and_date(article.get_link())
-    #     print(article, "\n")
-    #     if article.get_article_id() == num_arts:
-    #         break
-    insert_data(articles[0],HOST,USER,'Dungeon!995',DATABASE)
+
+    insert_batch(articles, BATCH_SIZE, HOST, USER, 'Dungeon!995', DATABASE)
 
 
 if __name__ == '__main__':
