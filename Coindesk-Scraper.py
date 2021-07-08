@@ -151,13 +151,20 @@ def welcome():
     coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
                                  help=f'Number of articles, from 1 to {MAX_ARTICLES}',
                                  choices=list(range(1, MAX_ARTICLES + 1)))
-    coindesk_reader.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
+    coindesk_reader.add_argument('-date', type=lambda s: datetime.datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
                                  help=f'Enter Date in "-date YYYY-MM-DD" format. '
                                       f'You will get articles published after that date')
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
     from_date = args.date
+    # Validating date is not too far back nor in the future
+    if from_date is not None:
+        now = datetime.datetime.today()
+        if from_date > now:
+            coindesk_reader.error("The date is the future, please enter another date")
+        if abs((from_date - now).days) > 365:
+            coindesk_reader.error("The date you entered is too far back, please enter a date within the last 365 days")
 
     return section_dict[section], num_articles, from_date
 
