@@ -10,6 +10,8 @@ Date: 23/06/2021
 import argparse
 import sys
 import textwrap as tw
+import pandas as pd
+import grequests
 import time
 import config as CFG
 import requests
@@ -19,6 +21,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tabulate import tabulate
+from tqdm import tqdm
 
 
 class Article:
@@ -50,23 +53,22 @@ class Article:
         get_article_id(self):
             Returns article id (int)
         """
-    article_id = 0
+    article_id = 0 # TODO change article_id to article_num
 
-    def __init__(self, article_html):
+    def __init__(self, title, summary, author, link, tags, date_published, category):
         """
         Constructs all necessary attributes of the vehicle object.
         :param article_html: article related html parsed from the main html.
         """
         Article.article_id += 1
-        self.article_html = article_html
         self.article_id = Article.article_id
-        self.name = article_html.h4.text
-        self.summary = article_html.p.text
-        self.author = [author.get_text() for author in article_html.find_all('span', class_='credit')]
-        links = [link.get('href') for link in article_html.find_all('a')]
-        self.link = CFG.URL + links[CFG.ARTICLE_LINK_INDEX]
-        self.tags = None
-        self.date_published = None
+        self.title = title
+        self.summary = summary
+        self.author = author
+        self.link = link
+        self.tags = tags
+        self.date_published = date_published
+        self.category = category
 
     def __str__(self):
         """
@@ -74,37 +76,40 @@ class Article:
         :return: table
         """
         return tabulate(tabular_data=[
-            ['Title', self.name],
+            ['Title', self.title],
             ['Summary', '\n'.join(tw.wrap(self.summary, width=90))],
             ['Author', ', '.join(self.author)],
+            ['Category', self.category],
             ['Link', self.link],
             ['Tags', ', '.join(self.tags)],
-            ['Date-Time', self.date_published]
-            ],
+            ['Date/Time Published', self.date_published]
+        ],
             headers=['#', self.article_id],
             tablefmt='plain')
 
-    def set_tags_and_date(self, article_link):
-        """
-        Receives a url to an article.
-        Retrieves the url source code as html.
-        Scrapes and returns the articles topic tags and datetime of publication.
-        :param article_link: str
-        :return: list of strings
-        """
-        sub_r = requests.get(article_link)
-        sub_soup = BeautifulSoup(sub_r.content, 'html.parser')
-        tags_tag = sub_soup.find('div', class_='tags')
-        self.tags = [tag.get_text() for tag in tags_tag.find_all('a')]
-        self.date_published = sub_soup.find('time').get('datetime')
+    def get_article_id(self):
+        """Returns article id (int)"""
+        return self.article_id
+
+    def get_title(self):
+        """Returns article title (str)"""
+        return self.title
+
+    def get_summary(self):
+        """Returns article summary"""
+        return self.summary
 
     def get_link(self):
         """Returns url (str) to article webpage"""
         return self.link
 
-    def get_article_id(self):
-        """Returns article id (int)"""
-        return self.article_id
+    def get_tags(self):
+        """Returns article tags (list)"""
+        return self.tags
+
+    def get_date_published(self):
+        """Returns date and time article was published."""
+        return self.date_published
 
 
 def welcome():
@@ -146,12 +151,12 @@ def welcome():
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
     coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
                                  help=f'Number of articles, from 1 to {CFG.MAX_ARTICLES}',
-                                 choices=list(range(1, CFG.MAX_ARTICLES+1)))
+                                 choices=list(range(1, CFG.MAX_ARTICLES + 1)))
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
 
-    return section_dict[section], num_articles
+    return section_dict[section], num_articles, section  # TODO section needs to be refactored as category
 
 
 def get_html(url, num_articles):
@@ -161,32 +166,102 @@ def get_html(url, num_articles):
     Returns the page source code as html,"""
     browser = webdriver.Chrome()
     browser.get(url)
-    scrolls = (num_articles - CFG.ARTICLES_PER_HOME)//CFG.ARTICLES_PER_PAGE + 1
-    for click_more in range(scrolls):
+    # scrolls = (num_articles - CFG.ARTICLES_PER_HOME) // CFG.ARTICLES_PER_PAGE + 1
+    num_elements = 0
+    while num_elements < num_articles: #TODO Add date condition.
+    # for click_more in tqdm(range(scrolls)):
+        num_elements = len(browser.find_elements_by_class_name("text-content"))
         try:
             more_button = WebDriverWait(browser, 10).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
 
-        except Exception:
+        except Exception: #TODO make this exception not so general.
             print("Articles did not load in time due to network.")
             browser.close()
             sys.exit(1)
 
         more_button.click()
-        time.sleep(CFG.SLEEPTIME)
+        # time.sleep(CFG.SLEEPTIME)
 
     html = browser.page_source
     return html
 
 
-def parse_article_html(html):
+def scrape_main(html):
     """
-    Parses each article html from main url html.
-    :param html: the main page html (str)
-    :return: list of html strings for each article
+    Receives the full html from the main page and returns a list of urls to all the articles.
+    :param html: str
+    :return: list
     """
-    soup = BeautifulSoup(html, 'html.parser')
-    return [article_html for article_html in soup.find_all('div', class_='text-content')]
+    soup = BeautifulSoup(html, 'html.parser').find('div', class_='story-stack')
+    titles = [article_block.h4.get_text() for article_block in soup.find_all('div', class_="text-content")]
+    summaries = [article_block.find('p', class_="card-text").get_text()
+                 for article_block in soup.find_all('div', class_="text-content")]
+    links = pd.Series(
+        [CFG.URL + link.get('href') for link in soup.find_all('a', title=True)
+         if str(link.get('href')).count("/") == 1]).unique()
+
+    return titles, summaries, links
+
+
+def scrape_articles(urls):  # TODO Add doc strings
+    responses = grequests.map((grequests.get(url) for url in urls))
+    soups = [BeautifulSoup(response.content, 'html.parser') for response in responses]
+    authors = [[author.get_text() for author in soup.find('div', class_="article-hero-authors").find_all('h5')]
+               for soup in soups]
+    tags = [[tag.get_text() for tag in soup.find('div', class_='tags').find_all('a')] for soup in soups]
+    times_published = [soup.find('time').get('datetime') for soup in soups]
+    # titles = [soup.h1.get_text() for soup in soups]
+    # summaries = [soup.find('div', class_="article-hero-blurb").p.get_text()
+    #              if soup.find_all('div', class_="article-hero-blurb")
+    #              else ""
+    #              for soup in soups]
+    # articles = [Article(titles[i],
+    #                     summaries[i],
+    #                     authors[i],
+    #                     urls[i],
+    #                     tags[i],
+    #                     time_published[i]) for i in range(len(urls))]
+    # for article in articles:
+    #     print(article, '\n')
+    return authors, tags, times_published
+
+
+def scraper(html, batch, category, num_arts):  # TODO Add doc strings
+    titles, summaries, links = scrape_main(html)
+
+    titles = list(split_list(titles, batch))
+    summaries = list(split_list(summaries, batch))
+    links = list(split_list(links,batch))
+
+    for set_number, link_set in enumerate(links):
+        articles = []
+        authors, tags, times_published = scrape_articles(link_set)
+        for art_number in range(len(authors)):
+            new_article = Article(
+                                title=titles[set_number][art_number],
+                                summary=summaries[set_number][art_number],
+                                author=authors[art_number],
+                                link=links[set_number][art_number],
+                                tags=tags[art_number],
+                                date_published=times_published[art_number],
+                                category=category
+                                )
+            print(new_article, '\n')
+            articles.append(new_article)
+            # TODO: Roni add insert functionality here with your function.
+            # TODO if you insert by single article at a time insert here.
+
+            if new_article.get_article_id() >= num_arts: # TODO Add date condition.
+            # TODO if you inserting by a list, insert here.
+
+                return
+
+
+def split_list(lst, n):
+    """Yields a generator with lists of n sizes chunks and a remainder if necessary"""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
 
 
 def main():
@@ -194,15 +269,12 @@ def main():
     Uses selenium to retrieve the required html script.
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
-    section, num_arts = welcome()
+    before = time.time()
+    section, num_arts, category = welcome()
     html = get_html(CFG.URL + section, num_arts)
-    article_html_list = parse_article_html(html)
-    articles = [Article(article_html) for article_html in article_html_list]
-    for article in articles:
-        article.set_tags_and_date(article.get_link())
-        print(article, "\n")
-        if article.get_article_id() == num_arts:
-            break
+    scraper(html, CFG.BATCH, category, num_arts)
+    after = time.time()
+    print(f"\nScraping took {round(after-before,3)} seconds.")
 
 
 if __name__ == '__main__':
