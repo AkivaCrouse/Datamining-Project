@@ -84,6 +84,11 @@ def drop_database(user, password, host, database):
             cursor.execute(f'DROP DATABASE {database}')
 
 
+def reset_database(user, password, host, database):
+    drop_database(user, password, host, database)
+    initialize_database(user, password, host, database)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--username', help='username of mysql', default=USER)
@@ -92,10 +97,12 @@ def main():
     parser.add_argument('-db', '--database', help='Name of database to create', default=DATABASE)
     parser.add_argument('--print', help='Show the created DB and its tables', action='store_true')
     parser.add_argument('--delete', help='Clean database for tests', action='store_true')
+    parser.add_argument('--reset', help='Reset database for tests', action='store_true')
     args = parser.parse_args()
     try:
         initialize_database(args.username, args.password, args.host, args.database)
-
+        if args.reset:
+            reset_database(args.username, args.password, args.host, args.database)
         if args.print:
             show_and_describe_tables(args.username, args.password, args.host, args.database)
         if args.delete:
