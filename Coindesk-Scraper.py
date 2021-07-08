@@ -151,11 +151,15 @@ def welcome():
     coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
                                  help=f'Number of articles, from 1 to {MAX_ARTICLES}',
                                  choices=list(range(1, MAX_ARTICLES + 1)))
+    coindesk_reader.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
+                                 help=f'Enter Date in "-date YYYY-MM-DD" format. '
+                                      f'You will get articles published after that date')
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
+    from_date = args.date
 
-    return section_dict[section], num_articles
+    return section_dict[section], num_articles, from_date
 
 
 def get_html(url, num_articles):
@@ -256,7 +260,7 @@ def main():
     Uses selenium to retrieve the required html script.
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
-    section, num_arts = welcome()
+    section, num_arts, from_date = welcome()
     html = get_html(URL + section, num_arts)
     article_html_list = parse_article_html(html)
     articles = [Article(article_html) for article_html in tqdm.tqdm(article_html_list)]
