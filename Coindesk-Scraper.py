@@ -23,6 +23,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from tabulate import tabulate
 from tqdm import tqdm
+from datetime import datetime
 
 
 class Article:
@@ -154,7 +155,7 @@ def welcome():
     coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
                                  help=f'Number of articles, from 1 to {MAX_ARTICLES}',
                                  choices=list(range(1, MAX_ARTICLES + 1)))
-    coindesk_reader.add_argument('-date', type=lambda s: datetime.datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
+    coindesk_reader.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
                                  help=f'Enter Date in "-date YYYY-MM-DD" format. '
                                       f'You will get articles published after that date')
     args = coindesk_reader.parse_args()
@@ -163,7 +164,7 @@ def welcome():
     from_date = args.date
     # Validating date is not too far back nor in the future
     if from_date is not None:
-        now = datetime.datetime.today()
+        now = datetime.today()
         if from_date > now:
             coindesk_reader.error("The date is the future, please enter another date")
         if abs((from_date - now).days) > 365:
@@ -172,29 +173,41 @@ def welcome():
     return section_dict[section], num_articles, section, from_date
 
 
-def get_html(url, num_articles):
+def get_html(url, num_articles, from_date):
     """Receives the url to coindesk.com.
     Opens the url using Chrome driver.
     Clicks on the 'MORE' button several times.
     Returns the page source code as html,"""
     browser = webdriver.Chrome()
     browser.get(url)
-    # scrolls = (num_articles - CFG.ARTICLES_PER_HOME) // CFG.ARTICLES_PER_PAGE + 1
-    num_elements = 0
-    while num_elements < num_articles: #TODO Add date condition.
-    # for click_more in tqdm(range(scrolls)):
-        num_elements = len(browser.find_elements_by_class_name("text-content"))
-        try:
-            more_button = WebDriverWait(browser, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
+    if from_date is None:
+        num_elements = 0
+        while num_elements < num_articles: #TODO Add date condition.
+            num_elements = len(browser.find_elements_by_class_name("text-content"))
+            try:
+                more_button = WebDriverWait(browser, 10).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
+            except Exception: #TODO make this exception not so general.
+                print("Articles did not load in time due to network.")
+                browser.close()
+                sys.exit(1)
+            more_button.click()
+            time.sleep(1)
 
-        except Exception: #TODO make this exception not so general.
-            print("Articles did not load in time due to network.")
-            browser.close()
-            sys.exit(1)
-
-        more_button.click()
-        # time.sleep(CFG.SLEEPTIME)
+    else:
+        page_time = datetime.today()
+        while page_time > from_date:
+            page_time = datetime.strptime(browser.find_elements_by_class_name("time")[-1].text, '%b %d, %Y')
+            # print(page_time)
+            try:
+                more_button = WebDriverWait(browser, 10).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
+            except Exception: #TODO make this exception not so general.
+                print("Articles did not load in time due to network.")
+                browser.close()
+                sys.exit(1)
+            more_button.click()
+            time.sleep(1)
 
     html = browser.page_source
     return html
@@ -211,7 +224,7 @@ def scrape_main(html):
     summaries = [article_block.find('p', class_="card-text").get_text()
                  for article_block in soup.find_all('div', class_="text-content")]
     links = pd.Series(
-        [CFG.URL + link.get('href') for link in soup.find_all('a', title=True)
+        [URL + link.get('href') for link in soup.find_all('a', title=True)
          if str(link.get('href')).count("/") == 1]).unique()
 
     return titles, summaries, links
@@ -224,23 +237,10 @@ def scrape_articles(urls):  # TODO Add doc strings
                for soup in soups]
     tags = [[tag.get_text() for tag in soup.find('div', class_='tags').find_all('a')] for soup in soups]
     times_published = [soup.find('time').get('datetime') for soup in soups]
-    # titles = [soup.h1.get_text() for soup in soups]
-    # summaries = [soup.find('div', class_="article-hero-blurb").p.get_text()
-    #              if soup.find_all('div', class_="article-hero-blurb")
-    #              else ""
-    #              for soup in soups]
-    # articles = [Article(titles[i],
-    #                     summaries[i],
-    #                     authors[i],
-    #                     urls[i],
-    #                     tags[i],
-    #                     time_published[i]) for i in range(len(urls))]
-    # for article in articles:
-    #     print(article, '\n')
     return authors, tags, times_published
 
 
-def scraper(html, batch, category, num_arts):  # TODO Add doc strings
+def scraper(html, batch, category, num_arts, from_date):  # TODO Add doc strings
     titles, summaries, links = scrape_main(html)
 
     titles = list(split_list(titles, batch))
@@ -260,15 +260,21 @@ def scraper(html, batch, category, num_arts):  # TODO Add doc strings
                                 date_published=times_published[art_number],
                                 category=category
                                 )
-            print(new_article, '\n')
-            articles.append(new_article)
-            # TODO: Roni add insert functionality here with your function.
-            # TODO if you insert by single article at a time insert here.
-
-            if new_article.get_article_id() >= num_arts: # TODO Add date condition.
-            # TODO if you inserting by a list, insert here.
-
+            article_date_time = datetime.strptime(new_article.get_date_published(), '%Y-%m-%dT%H:%M:%S')
+            # print(article_date_time)
+            if from_date is not None and article_date_time < from_date:
                 return
+
+            else:
+                print(new_article, '\n')
+                articles.append(new_article)
+                # TODO: Roni add insert functionality here with your function.
+                # TODO if you insert by single article at a time insert here.
+
+                if new_article.get_article_id() >= num_arts and from_date is None: # TODO Add date condition.
+                # TODO if you inserting by a list, insert here.
+
+                    return
 
 
 def split_list(lst, n):
@@ -341,9 +347,9 @@ def main():
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     before = time.time()
-    section, num_arts, category = welcome()
-    html = get_html(CFG.URL + section, num_arts)
-    scraper(html, CFG.BATCH, category, num_arts)
+    section, num_arts, category, from_date = welcome()
+    html = get_html(URL + section, num_arts, from_date)
+    scraper(html, BATCH, category, num_arts, from_date)
     after = time.time()
     print(f"\nScraping took {round(after-before,3)} seconds.")
 
