@@ -110,27 +110,28 @@ class Article:
         return self.article_id
 
 
+# Overriding error function in order to display the help message
+# whenever the error method is triggered - UX purposes.
+class MyParser(argparse.ArgumentParser):
+    """
+    Overriding the 'error' function in ArgumentParser in order to display the help message
+    whenever the error method is triggered, for UX purposes.
+    """
+
+    def error(self, message):
+        sys.stderr.write('error: %s\n' % message)
+        self.print_help()
+        sys.exit(2)
+
+
 def welcome():
     """
     Gets the section and number of articles required by the user, with argparser,
     and outputs the relevant URL suffix for these articles together with the number of articles.
     the program also response to the flag -h for help.
-    :return:    section: relevant section URL suffix.
-                num_articles: number of articles requested by the user
+    return:    section: relevant section URL suffix.
+               num_articles: number of articles requested by the user
     """
-
-    # Overriding error function in order to display the help message
-    # whenever the error method is triggered, for UX purposes.
-    class MyParser(argparse.ArgumentParser):
-        """
-        Overriding the 'error' function in ArgumentParser in order to display the help message
-        whenever the error method is triggered, for UX purposes.
-        """
-
-        def error(self, message):
-            sys.stderr.write('error: %s\n' % message)
-            self.print_help()
-            sys.exit(2)
 
     section_dict = {
         'tech': DEFAULT_PREFIX + 'tech',
@@ -259,7 +260,6 @@ def main():
     html = get_html(URL + section, num_arts)
     article_html_list = parse_article_html(html)
     articles = [Article(article_html) for article_html in tqdm.tqdm(article_html_list)]
-
     insert_batch(articles, BATCH_SIZE, HOST, USER, 'Dungeon!995', DATABASE)
 
 
