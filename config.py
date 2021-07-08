@@ -1,5 +1,20 @@
+# SQL defaults
+HOST = 'localhost'
+USER = 'root'
+DATABASE = 'Coindesk'
+# Table names
+ARTICLES_TABLE = 'Articles'
+AUTHORS_TABLE = 'Authors'
+SUMMARIES_TABLE = 'Summaries'
+TAGS_TABLE = 'Tags'
+CATEGORIES_TABLE = 'Categories'
+TAGS_ARTICLES_TABLE = 'Tags_in_articles'
+AUTHORS_ARTICLES_TABLE = 'Authors_in_articles'
+
+
 # PATH = "C:\Program Files (x86)\chromedriver.exe"
 ARTICLE_LINK_INDEX = 1
+BATCH_SIZE = 10
 URL = "https://www.coindesk.com"
 TAGS = 0
 DATETIME = 1

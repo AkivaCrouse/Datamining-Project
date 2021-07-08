@@ -13,7 +13,8 @@ import textwrap as tw
 import pandas as pd
 import grequests
 import time
-import config as CFG
+import datetime
+from config import *
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -112,33 +113,34 @@ class Article:
         return self.date_published
 
 
+# Overriding error function in order to display the help message
+# whenever the error method is triggered - UX purposes.
+class MyParser(argparse.ArgumentParser):
+    """
+    Overriding the 'error' function in ArgumentParser in order to display the help message
+    whenever the error method is triggered, for UX purposes.
+    """
+
+    def error(self, message):
+        sys.stderr.write('error: %s\n' % message)
+        self.print_help()
+        sys.exit(2)
+
+
 def welcome():
     """
     Gets the section and number of articles required by the user, with argparser,
     and outputs the relevant URL suffix for these articles together with the number of articles.
     the program also response to the flag -h for help.
-    :return:    section: relevant section URL suffix.
-                num_articles: number of articles requested by the user
+    return:    section: relevant section URL suffix.
+               num_articles: number of articles requested by the user
     """
 
-    # Overriding error function in order to display the help message
-    # whenever the error method is triggered, for UX purposes.
-    class MyParser(argparse.ArgumentParser):
-        """
-        Overriding the 'error' function in ArgumentParser in order to display the help message
-        whenever the error method is triggered, for UX purposes.
-        """
-
-        def error(self, message):
-            sys.stderr.write('error: %s\n' % message)
-            self.print_help()
-            sys.exit(2)
-
     section_dict = {
-        'tech': CFG.DEFAULT_PREFIX + 'tech',
-        'business': CFG.DEFAULT_PREFIX + 'business',
-        'people': CFG.DEFAULT_PREFIX + 'people',
-        'regulation': CFG.DEFAULT_PREFIX + 'policy-regulation',
+        'tech': DEFAULT_PREFIX + 'tech',
+        'business': DEFAULT_PREFIX + 'business',
+        'people': DEFAULT_PREFIX + 'people',
+        'regulation': DEFAULT_PREFIX + 'policy-regulation',
         'features': '/features',
         'markets': '/markets',
         'opinion': '/opinion',
@@ -150,13 +152,24 @@ def welcome():
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
     coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
-                                 help=f'Number of articles, from 1 to {CFG.MAX_ARTICLES}',
-                                 choices=list(range(1, CFG.MAX_ARTICLES + 1)))
+                                 help=f'Number of articles, from 1 to {MAX_ARTICLES}',
+                                 choices=list(range(1, MAX_ARTICLES + 1)))
+    coindesk_reader.add_argument('-date', type=lambda s: datetime.datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
+                                 help=f'Enter Date in "-date YYYY-MM-DD" format. '
+                                      f'You will get articles published after that date')
     args = coindesk_reader.parse_args()
     section = args.section
     num_articles = int(args.num_articles)
+    from_date = args.date
+    # Validating date is not too far back nor in the future
+    if from_date is not None:
+        now = datetime.datetime.today()
+        if from_date > now:
+            coindesk_reader.error("The date is the future, please enter another date")
+        if abs((from_date - now).days) > 365:
+            coindesk_reader.error("The date you entered is too far back, please enter a date within the last 365 days")
 
-    return section_dict[section], num_articles, section  # TODO section needs to be refactored as category
+    return section_dict[section], num_articles, section, from_date
 
 
 def get_html(url, num_articles):
@@ -262,6 +275,64 @@ def split_list(lst, n):
     """Yields a generator with lists of n sizes chunks and a remainder if necessary"""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+
+def insert_batch(articles, batch_size, host, user, password, database):
+    with pymysql.connect(host=host, user=user, password=password, database=database,
+                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+        count = 0
+        for a in articles:
+            insert_data(a, connection_instance)
+            count += 1
+            if count == batch_size:
+                connection_instance.commit()
+                count = 0
+        connection_instance.commit()
+
+
+def insert_data(article, conn):
+    with conn.cursor() as cursor:
+        sql = f'''INSERT INTO {SUMMARIES_TABLE} (summary) 
+            VALUES (%s)'''
+        cursor.execute(sql, article.summary)
+        summary_id = cursor.lastrowid
+        sql = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
+            VALUES (%s, %s, %s, %s)'''
+        cursor.execute(sql, [article.name, summary_id,
+                             datetime.datetime.strptime(article.date_published, "%Y-%m-%dT%H:%M:%S"), article.link])
+
+        article_id = cursor.lastrowid
+        for author in article.author:
+            cursor.execute(f'SELECT id FROM {AUTHORS_TABLE} WHERE name = "{author}"')
+            result = cursor.fetchone()
+            if result is None:
+                cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("{author}")')
+                author_id = cursor.lastrowid
+            else:
+                author_id = result['id']
+            cursor.execute(f'INSERT INTO {AUTHORS_ARTICLES_TABLE} VALUES ({article_id},{author_id})')
+
+        for tag in article.tags:
+            cursor.execute(f'SELECT id FROM {TAGS_TABLE} WHERE name = "{tag}"')
+            result = cursor.fetchone()
+            if result is None:
+                cursor.execute(f'INSERT INTO {TAGS_TABLE} (name) VALUES ("{tag}")')
+                tag_id = cursor.lastrowid
+            else:
+                tag_id = result['id']
+            cursor.execute(f'INSERT INTO {TAGS_ARTICLES_TABLE} VALUES ({article_id},{tag_id})')
+    # cursor.execute(f'SELECT * FROM {ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {AUTHORS_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {AUTHORS_ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {TAGS_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {TAGS_ARTICLES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
+    # cursor.execute(f'SELECT * FROM {SUMMARIES_TABLE}')
+    # print(pd.DataFrame(cursor.fetchall()), end='\n\n')
 
 
 def main():
