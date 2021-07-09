@@ -4,7 +4,7 @@ import pandas as pd
 from config import *
 
 AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100)
+            name VARCHAR(100) UNIQUE
             )
             """
 SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
@@ -23,9 +23,7 @@ ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO
             title varchar(200),
             publication_date TIMESTAMP,
             url TEXT,
-            category_id INT,
             summary_id INT UNIQUE NOT NULL,
-            FOREIGN KEY(category_id) REFERENCES {CATEGORIES_TABLE}(id),
             FOREIGN KEY(summary_id) REFERENCES {SUMMARIES_TABLE}(id)
             )
             """
@@ -41,6 +39,13 @@ AUTHORS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS
             author_id INT,
             FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
             FOREIGN KEY(author_id) REFERENCES {AUTHORS_TABLE}(id)
+            )
+            """
+CATEGORIES_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_ARTICLES_TABLE} (
+            article_id INT,
+            category_id INT,
+            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
+            FOREIGN KEY(category_id) REFERENCES {CATEGORIES_TABLE}(id)
             )
             """
 
@@ -60,6 +65,7 @@ def initialize_database(user, password, host, database):
             cursor_instance.execute(ARTICLES_CREATION)
             cursor_instance.execute(TAGS_ARTICLES_RELATIONSHIP_CREATION)
             cursor_instance.execute(AUTHORS_ARTICLES_RELATIONSHIP_CREATION)
+            cursor_instance.execute(CATEGORIES_ARTICLES_RELATIONSHIP_CREATION)
 
 
 def show_and_describe_tables(user, password, host, database):
@@ -89,6 +95,16 @@ def reset_database(user, password, host, database):
     initialize_database(user, password, host, database)
 
 
+# def try_something(user, password, host, database):
+#     with pymysql.connect(host=host, user=user, password=password, database= database,
+#                      cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+#         with connection_instance.cursor() as cursor:
+#             cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("Aaron")')
+#             first_id = cursor.lastrowid
+#             cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("Aaron")')
+#             second_id = cursor.lastrowid
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--username', help='username of mysql', default=USER)
@@ -103,6 +119,7 @@ def main():
         initialize_database(args.username, args.password, args.host, args.database)
         if args.reset:
             reset_database(args.username, args.password, args.host, args.database)
+        # try_something(args.username, args.password, args.host, args.database)
         if args.print:
             show_and_describe_tables(args.username, args.password, args.host, args.database)
         if args.delete:
