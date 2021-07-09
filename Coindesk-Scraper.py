@@ -16,6 +16,8 @@ import grequests
 import time
 import datetime
 import pymysql
+import selenium.common.exceptions
+
 from config import *
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -138,6 +140,7 @@ class MyParser(argparse.ArgumentParser):
         :param message: message to present to user
         """
         sys.stderr.write('error: %s\n' % message)
+        coin_logger.error(message)
         self.print_help()
         sys.exit(2)
 
@@ -186,7 +189,6 @@ def welcome():
     coindesk_reader.add_argument('-db', '--database', help='Name of database to insert to', default=DATABASE)
 
     args = coindesk_reader.parse_args()
-    print(args)
     section = args.section
     scrape_by = {}
     if args.num is not None:
@@ -223,6 +225,7 @@ def by_number_of_articles(num_articles, browser):
                 EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
         except TimeoutException:
             print("Articles did not load in time due to network.")
+            coin_logger.error("Articles did not load in time due to network.")
             browser.close()
             sys.exit(1)
         more_button.click()
@@ -249,6 +252,7 @@ def by_date_of_articles(from_date, browser):
                 EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
         except TimeoutException:
             print("Articles did not load in time due to network.")
+            coin_logger.error("Articles did not load in time due to network.")
             browser.close()
             sys.exit(1)
         more_button.click()
@@ -264,8 +268,13 @@ def get_html(url, scrape_by):
     :return: the page source code as html
     """
     browser = webdriver.Chrome()
-    browser.get(url)
-    scrape_by[SCRAPE_BY_FUNCTION](scrape_by[SCRAPE_BY_PARAMETERS], browser)
+    try:
+        browser.get(url)
+        scrape_by[SCRAPE_BY_FUNCTION](scrape_by[SCRAPE_BY_PARAMETERS], browser)
+    except selenium.common.exceptions.WebDriverException as err:
+        print(err.msg)
+        coin_logger.error(err.msg)
+        exit(1)
     html = browser.page_source
     return html
 
@@ -277,10 +286,10 @@ def scrape_main(html):
     :return: list
     """
     soup = BeautifulSoup(html, 'html.parser').find('div', class_='story-stack')
-    # print(soup.prettify())
     links = pd.Series(
         [URL + link.get('href') for link in soup.find_all('a', title=True)
          if str(link.get('href')).count("/") == 1]).unique()
+    coin_logger.info('Scraped article urls from main page.')
     return links
 
 
@@ -298,6 +307,7 @@ def scrape_articles(urls):
         props = json.loads(soup.find(SCRIPT_TAG, id=SCRIPT_ID, type=SCRIPT_TYPE).string)[PROPERTIES_TAG][
             INITIAL_PROPERTIES_TAG][PAGE_PROPERTIES]
         if DATA_TAG not in props:  # article doesn't exist anymore (404 page)
+            coin_logger.warning('Encountered link that led to an internal 404 will not scrap its data.')
             continue
         else:
             data_dicts.append(props[DATA_TAG])
@@ -329,7 +339,7 @@ def scraper(html, batch, scrape_by, user, password, host, database):
     for set_number, link_set in enumerate(links):
         articles = []
         titles, summaries, authors, tags, times_published, categories = scrape_articles(link_set)
-
+        coin_logger.info('Scraped article batch from their pages')
         for art_number in range(len(authors)):
             new_article = Article(
                 title=titles[art_number],
@@ -342,10 +352,12 @@ def scraper(html, batch, scrape_by, user, password, host, database):
             )
             if stop_condition(new_article, scrape_by):
                 insert_batch(articles, batch, host, user, password, database)
+                coin_logger.info('Finished scraping and saved data to database.')
                 return
             print(new_article, '\n')
             articles.append(new_article)
         insert_batch(articles, batch, host, user, password, database)
+    coin_logger.info('Finished scraping and saved data to database.')
 
 
 def split_list(lst, n):
@@ -385,19 +397,26 @@ def insert_batch(articles, batch_size, host, user, password, database):
     :param database: database to save to
     :return:
     """
-    with pymysql.connect(host=host, user=user, password=password, database=database,
-                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
-        count = 0
-        for a in articles:
-            try:
-                insert_data(a, connection_instance)
-            except pymysql.err.IntegrityError as dup_err:
-                continue
-            count += 1
-            if count == batch_size:
-                connection_instance.commit()
-                count = 0
-        connection_instance.commit()
+    try:
+        with pymysql.connect(host=host, user=user, password=password, database=database,
+                             cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+            count = 0
+            for a in articles:
+                try:
+                    insert_data(a, connection_instance)
+                except pymysql.err.IntegrityError:
+                    coin_logger.warning(f'Duplicate data, will skip this article: {a.get_link()}.')
+                    continue
+                count += 1
+                if count == batch_size:
+                    connection_instance.commit()
+                    count = 0
+            connection_instance.commit()
+            coin_logger.info('Finished saving data batch to database')
+    except pymysql.err.Error as err:
+        print(err.args)
+        coin_logger.error(err.args)
+        exit(1)
 
 
 def insert_data(article, conn):
@@ -410,9 +429,11 @@ def insert_data(article, conn):
     # TODO: maybe find a way to reduce size of function?
     with conn.cursor() as cursor:
         cursor.execute(INSERT_INTO_SUMMARIES, article.get_summary())
+        coin_logger.info('Saved summary to database.')
         summary_id = cursor.lastrowid
         cursor.execute(INSERT_INTO_ARTICLES,
                        [article.get_title(), summary_id, article.get_date_published(), article.get_link()])
+        coin_logger.info('Saved article to database.')
         article_id = cursor.lastrowid
 
         for author in article.get_authors():
@@ -420,30 +441,39 @@ def insert_data(article, conn):
             result = cursor.fetchone()
             if result is None:
                 cursor.execute(INSERT_INTO_AUTHORS, [author])
+                coin_logger.info('Saved author to database.')
                 author_id = cursor.lastrowid
             else:
                 author_id = result[AUTHOR_ID]
+                coin_logger.debug('Author exists already in database.')
             cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR, [article_id, author_id])
+            coin_logger.info('Saved author-article relationship to database.')
 
         for tag in article.get_tags():
             cursor.execute(FIND_TAG, [tag])
             result = cursor.fetchone()
             if result is None:
                 cursor.execute(INSERT_INTO_TAGS, [tag])
+                coin_logger.info('Saved tag to database.')
                 tag_id = cursor.lastrowid
             else:
                 tag_id = result[TAG_ID]
+                coin_logger.debug('Tag exists already in database.')
             cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_TAG, [article_id, tag_id])
+            coin_logger.info('Saved tag-article relationship to database.')
 
         for category in article.get_categories():
             cursor.execute(FIND_CATEGORY, [category])
             result = cursor.fetchone()
             if result is None:
                 cursor.execute(INSERT_INTO_CATEGORY, [category])
+                coin_logger.info('Saved category to database.')
                 category_id = cursor.lastrowid
             else:
                 category_id = result[CATEGORY_ID]
+                coin_logger.debug('Category exists already in database.')
             cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY, [article_id, category_id])
+            coin_logger.info('Saved category-article relationship to database.')
 
 
 def main():

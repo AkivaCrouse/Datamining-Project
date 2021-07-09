@@ -1,3 +1,27 @@
+import logging
+# logging defaults
+COIN_DESK_LOG_FILE = 'coindesk.log'
+SQL_LOG_FILE = 'sql.log'
+coin_logger = logging.getLogger('articles')
+coin_logger.setLevel(logging.INFO)
+sql_logger = logging.getLogger('database-creation')
+sql_logger.setLevel(logging.INFO)
+formatter = logging.Formatter(
+    '%(asctime)s-%(levelname)s-FILE:%(filename)s-FUNC:%(funcName)s-LINE:%(lineno)d-%(message)s')
+
+# Coin Logger for log file
+file_handler = logging.FileHandler(COIN_DESK_LOG_FILE)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+coin_logger.addHandler(file_handler)
+
+# SQL Logger for log file
+file_handler = logging.FileHandler(SQL_LOG_FILE)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+sql_logger.addHandler(file_handler)
+
+
 # SQL defaults
 HOST = 'localhost'
 USER = 'root'
@@ -13,6 +37,8 @@ AUTHORS_ARTICLES_TABLE = 'Authors_in_articles'
 CATEGORIES_ARTICLES_TABLE = 'Categories_in_articles'
 
 # SQL Creation Scripts
+CREATE_DATABASE = 'CREATE DATABASE IF NOT EXISTS '
+USE_DATABASE = 'USE '
 AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(100) UNIQUE
             )

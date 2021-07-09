@@ -16,18 +16,25 @@ def initialize_database(user, password, host, database):
     with pymysql.connect(host=host, user=user, password=password,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
         with connection_instance.cursor() as cursor_instance:
-            create_database = 'CREATE DATABASE IF NOT EXISTS ' + database
-            use_database = 'USE ' + database
-            cursor_instance.execute(create_database)
-            cursor_instance.execute(use_database)
+            cursor_instance.execute(CREATE_DATABASE + database)
+            sql_logger.info("Created database if doesn't exist already.")
+            cursor_instance.execute(USE_DATABASE + database)
             cursor_instance.execute(AUTHORS_CREATION)
+            sql_logger.info("Created Authors table if doesn't exist already.")
             cursor_instance.execute(SUMMARIES_CREATION)
+            sql_logger.info("Created Summaries table if doesn't exist already.")
             cursor_instance.execute(CATEGORIES_CREATION)
+            sql_logger.info("Created Categories table if doesn't exist already.")
             cursor_instance.execute(TAGS_CREATION)
+            sql_logger.info("Created Tags table if doesn't exist already.")
             cursor_instance.execute(ARTICLES_CREATION)
+            sql_logger.info("Created Articles table if doesn't exist already.")
             cursor_instance.execute(TAGS_ARTICLES_RELATIONSHIP_CREATION)
+            sql_logger.info("Created tags-articles Relationship table if doesn't exist already.")
             cursor_instance.execute(AUTHORS_ARTICLES_RELATIONSHIP_CREATION)
+            sql_logger.info("Created author-articles Relationship table if doesn't exist already.")
             cursor_instance.execute(CATEGORIES_ARTICLES_RELATIONSHIP_CREATION)
+            sql_logger.info("Created categories-articles Relationship table if doesn't exist already.")
 
 
 def show_and_describe_tables(user, password, host, database):
@@ -44,7 +51,7 @@ def show_and_describe_tables(user, password, host, database):
         with connection_instance.cursor() as cursor:
             cursor.execute('SHOW TABLES')
             results = cursor.fetchall()
-            results = map(lambda x: x['Tables_in_' + DATABASE], results)
+            results = map(lambda x: x['Tables_in_' + database], results)
             for r in results:
                 print(r, ':')
                 cursor.execute('DESCRIBE ' + r)
@@ -66,6 +73,7 @@ def drop_database(user, password, host, database):
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
         with connection_instance.cursor() as cursor:
             cursor.execute(f'DROP DATABASE {database}')
+    sql_logger.info(f'Deleted the database {database}.')
 
 
 def reset_database(user, password, host, database):
@@ -79,6 +87,7 @@ def reset_database(user, password, host, database):
     """
     drop_database(user, password, host, database)
     initialize_database(user, password, host, database)
+    sql_logger.info(f'Reset the database {database}.')
 
 
 def main():
@@ -100,6 +109,7 @@ def main():
         if args.delete:
             drop_database(args.username, args.password, args.host, args.database)
     except pymysql.err.Error as err:
+        sql_logger.error(err.args)
         print(err.args)
         exit(1)
 
