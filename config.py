@@ -12,6 +12,74 @@ TAGS_ARTICLES_TABLE = 'Tags_in_articles'
 AUTHORS_ARTICLES_TABLE = 'Authors_in_articles'
 CATEGORIES_ARTICLES_TABLE = 'Categories_in_articles'
 
+# SQL Creation Scripts
+AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) UNIQUE
+            )
+            """
+SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
+            summary VARCHAR(400)  UNIQUE
+            )
+            """
+CATEGORIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
+            category VARCHAR(100)
+            )
+            """
+TAGS_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100)
+            )
+            """
+ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
+            title varchar(200),
+            publication_date TIMESTAMP,
+            url VARCHAR(300) UNIQUE,
+            summary_id INT UNIQUE NOT NULL,
+            FOREIGN KEY(summary_id) REFERENCES {SUMMARIES_TABLE}(id)
+            )
+            """
+TAGS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_ARTICLES_TABLE} (
+            article_id INT,
+            tag_id INT,
+            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
+            FOREIGN KEY(tag_id) REFERENCES {TAGS_TABLE}(id)
+            )
+            """
+AUTHORS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_ARTICLES_TABLE} (
+            article_id INT,
+            author_id INT,
+            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
+            FOREIGN KEY(author_id) REFERENCES {AUTHORS_TABLE}(id)
+            )
+            """
+CATEGORIES_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_ARTICLES_TABLE} (
+            article_id INT,
+            category_id INT,
+            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
+            FOREIGN KEY(category_id) REFERENCES {CATEGORIES_TABLE}(id)
+            )
+            """
+
+
+
+# SQL INSERT scripts
+INSERT_INTO_SUMMARIES = f'''INSERT INTO {SUMMARIES_TABLE} (summary) VALUES (%s)'''
+INSERT_INTO_ARTICLES = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
+            VALUES (%s, %s, %s, %s)'''
+FIND_AUTHOR = f'SELECT id FROM {AUTHORS_TABLE} WHERE name = %s'
+INSERT_INTO_AUTHORS = f'INSERT INTO {AUTHORS_TABLE} (name) VALUES (%s)'
+INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR = f'INSERT INTO {AUTHORS_ARTICLES_TABLE} VALUES (%s, %s)'
+FIND_TAG = f'SELECT id FROM {TAGS_TABLE} WHERE name = %s'
+INSERT_INTO_TAGS = f'INSERT INTO {TAGS_TABLE} (name) VALUES (%s)'
+INSERT_INTO_RELATIONSHIP_ARTICLE_TAG = f'INSERT INTO {TAGS_ARTICLES_TABLE} VALUES (%s, %s)'
+FIND_CATEGORY = f'SELECT id FROM {CATEGORIES_TABLE} WHERE category = %s'
+INSERT_INTO_CATEGORY = f'INSERT INTO {CATEGORIES_TABLE} (category) VALUES (%s)'
+INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY = f'INSERT INTO {CATEGORIES_ARTICLES_TABLE} VALUES (%s, %s)'
+
+
+# Table field names
+AUTHOR_ID = 'id'
+TAG_ID = 'id'
+CATEGORY_ID = 'id'
 
 # PATH = "C:\Program Files (x86)\chromedriver.exe"
 ARTICLE_LINK_INDEX = 1
@@ -27,3 +95,34 @@ ARTICLES_PER_PAGE = 12
 DEFAULT_PREFIX = '/category/'
 SLEEPTIME = 3
 BATCH = 10
+
+# Scraping metadata tags
+SCRIPT_TAG = 'script'
+SCRIPT_ID = '__NEXT_DATA__'
+SCRIPT_TYPE = 'application/json'
+PROPERTIES_TAG = 'props'
+INITIAL_PROPERTIES_TAG = 'initialProps'
+PAGE_PROPERTIES = 'pageProps'
+DATA_TAG = 'data'
+TITLE_TAG = 'headline'
+SUMMARY_TAG = 'excerpt'
+AUTHORS_TAG = 'authors'
+AUTHOR_NAME_TAG = 'name'
+TAGS_TAG = 'tags'
+TAG_NAME_TAG = 'name'
+PUBLISHED_DATE_TAG = 'published'
+PUBLISHED_DATE_FORMAT = '%Y-%m-%dT%H:%M:%S'
+CATEGORY_TAG = 'category'
+TAXONOMY_TAG = 'taxonomy'
+
+# Main date format constants
+TODAY = 'Today'
+YESTERDAY = 'Yesterday'
+date_format = '%b %d, %Y'
+
+# CLI scrape_by Constants
+SCRAPE_BY_TYPE = 'type'
+SCRAPE_BY_FUNCTION = 'function'
+SCRAPE_BY_PARAMETERS = 'parameters'
+NUM_SCRAPE_TYPE = 'num'
+DATE_SCRAPE_TYPE = 'date'

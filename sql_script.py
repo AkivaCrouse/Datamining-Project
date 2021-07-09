@@ -2,55 +2,17 @@ import pymysql
 import argparse
 import pandas as pd
 from config import *
-
-AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) UNIQUE
-            )
-            """
-SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            summary TEXT
-            )
-            """
-CATEGORIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            category VARCHAR(100)
-            )
-            """
-TAGS_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100)
-            )
-            """
-ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            title varchar(200),
-            publication_date TIMESTAMP,
-            url TEXT,
-            summary_id INT UNIQUE NOT NULL,
-            FOREIGN KEY(summary_id) REFERENCES {SUMMARIES_TABLE}(id)
-            )
-            """
-TAGS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_ARTICLES_TABLE} (
-            article_id INT,
-            tag_id INT,
-            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
-            FOREIGN KEY(tag_id) REFERENCES {TAGS_TABLE}(id)
-            )
-            """
-AUTHORS_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_ARTICLES_TABLE} (
-            article_id INT,
-            author_id INT,
-            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
-            FOREIGN KEY(author_id) REFERENCES {AUTHORS_TABLE}(id)
-            )
-            """
-CATEGORIES_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATEGORIES_ARTICLES_TABLE} (
-            article_id INT,
-            category_id INT,
-            FOREIGN KEY(article_id) REFERENCES {ARTICLES_TABLE}(id),
-            FOREIGN KEY(category_id) REFERENCES {CATEGORIES_TABLE}(id)
-            )
-            """
+# pd.set_option('display.max_rows', None)
 
 
 def initialize_database(user, password, host, database):
+    """
+    create the database with all the tables
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    """
     with pymysql.connect(host=host, user=user, password=password,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
         with connection_instance.cursor() as cursor_instance:
@@ -69,6 +31,14 @@ def initialize_database(user, password, host, database):
 
 
 def show_and_describe_tables(user, password, host, database):
+    """
+    present the database data
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    :return:
+    """
     with pymysql.connect(host=host, user=user, password=password, database=database,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
         with connection_instance.cursor() as cursor:
@@ -84,6 +54,14 @@ def show_and_describe_tables(user, password, host, database):
 
 
 def drop_database(user, password, host, database):
+    """
+    delete the whole database
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    :return:
+    """
     with pymysql.connect(host=host, user=user, password=password,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
         with connection_instance.cursor() as cursor:
@@ -91,18 +69,16 @@ def drop_database(user, password, host, database):
 
 
 def reset_database(user, password, host, database):
+    """
+    reset the database to have 0 rows in each table
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    :return:
+    """
     drop_database(user, password, host, database)
     initialize_database(user, password, host, database)
-
-
-# def try_something(user, password, host, database):
-#     with pymysql.connect(host=host, user=user, password=password, database= database,
-#                      cursorclass=pymysql.cursors.DictCursor) as connection_instance:
-#         with connection_instance.cursor() as cursor:
-#             cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("Aaron")')
-#             first_id = cursor.lastrowid
-#             cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("Aaron")')
-#             second_id = cursor.lastrowid
 
 
 def main():
@@ -119,7 +95,6 @@ def main():
         initialize_database(args.username, args.password, args.host, args.database)
         if args.reset:
             reset_database(args.username, args.password, args.host, args.database)
-        # try_something(args.username, args.password, args.host, args.database)
         if args.print:
             show_and_describe_tables(args.username, args.password, args.host, args.database)
         if args.delete:

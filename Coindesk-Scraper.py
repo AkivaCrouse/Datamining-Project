@@ -15,15 +15,14 @@ import pandas as pd
 import grequests
 import time
 import datetime
-
 import pymysql
-
 from config import *
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException
 from tabulate import tabulate
 from datetime import datetime
 from datetime import date
@@ -64,7 +63,6 @@ class Article:
     def __init__(self, title, summary, author, link, tags, date_published, categories):
         """
         Constructs all necessary attributes of the vehicle object.
-        :param article_html: article related html parsed from the main html.
         """
         Article.article_id += 1
         self.article_id = Article.article_id
@@ -94,35 +92,35 @@ class Article:
             tablefmt='plain')
 
     def get_article_id(self):
-        """Returns article id (int)"""
+        """:return: article id (int)"""
         return self.article_id
 
     def get_title(self):
-        """Returns article title (str)"""
+        """:return: article title (str)"""
         return self.title
 
     def get_summary(self):
-        """Returns article summary"""
+        """:return: article summary"""
         return self.summary
 
     def get_link(self):
-        """Returns url (str) to article webpage"""
+        """:return: url (str) to article webpage"""
         return self.link
 
     def get_tags(self):
-        """Returns article tags (list)"""
+        """:return: article tags (list)"""
         return self.tags
 
     def get_date_published(self):
-        """Returns date and time article was published."""
+        """:return: date and time article was published."""
         return self.date_published
 
     def get_categories(self):
-        """Returns the categories the article belongs to"""
+        """:return: the categories the article belongs to"""
         return self.categories
 
     def get_authors(self):
-        """Returns the authors that wrote the article"""
+        """:return: the authors that wrote the article"""
         return self.author
 
 
@@ -135,6 +133,10 @@ class MyParser(argparse.ArgumentParser):
     """
 
     def error(self, message):
+        """
+        overridden error function
+        :param message: message to present to user
+        """
         sys.stderr.write('error: %s\n' % message)
         self.print_help()
         sys.exit(2)
@@ -146,7 +148,11 @@ def welcome():
     and outputs the relevant URL suffix for these articles together with the number of articles.
     the program also response to the flag -h for help.
     return:    section: relevant section URL suffix.
-               num_articles: number of articles requested by the user
+               scrape_by: number of articles requested by the user
+               username: username for mysql
+               password: password for mysql
+               host: url of database server
+               database: database that the program is going to save the data to
     """
 
     section_dict = {
@@ -165,7 +171,7 @@ def welcome():
                                  help='Choose one of the following sections: latest, tech, business, regulation, people, '
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
-    date_or_num.add_argument('-num', type=float, metavar='num_articles',
+    date_or_num.add_argument('-num', type=int, metavar='num_articles',
                              help=f'You can choose one of the two options: -num or -date.'
                                   f'\nChoose number of articles, from 1 to {MAX_ARTICLES} '
                                   f'in "-num [your number]" format.',
@@ -174,14 +180,21 @@ def welcome():
                              help=f'You can choose one of the two options: -num or -date. '
                                   f' Enter Date in "-date YYYY-MM-DD" format. '
                                   f'You will get articles published after that date')
+    coindesk_reader.add_argument('-u', '--username', help='username of mysql', default=USER)
+    coindesk_reader.add_argument('-p', '--password', help='password of mysql', required=True)
+    coindesk_reader.add_argument('-host', help='url of database server', default=HOST)
+    coindesk_reader.add_argument('-db', '--database', help='Name of database to insert to', default=DATABASE)
 
     args = coindesk_reader.parse_args()
     print(args)
     section = args.section
+    scrape_by = {}
+    if args.num is not None:
+        scrape_by[SCRAPE_BY_TYPE] = NUM_SCRAPE_TYPE
+        scrape_by[SCRAPE_BY_FUNCTION] = by_number_of_articles
+        scrape_by[SCRAPE_BY_PARAMETERS] = int(args.num)
 
-    num_articles = int(args.num) if (args.num is not None) else args.num
     from_date = args.date
-
     # Validating date is not too far back nor in the future
     if from_date is not None:
         now = datetime.today()
@@ -189,53 +202,70 @@ def welcome():
             coindesk_reader.error("The date is the future, please enter another date")
         if abs((from_date - now).days) > 365:
             coindesk_reader.error("The date you entered is too far back, please enter a date within the last 365 days")
+        scrape_by[SCRAPE_BY_TYPE] = DATE_SCRAPE_TYPE
+        scrape_by[SCRAPE_BY_FUNCTION] = by_date_of_articles
+        scrape_by[SCRAPE_BY_PARAMETERS] = from_date
 
-    return section_dict[section], num_articles, section, from_date
+    return section_dict[section], scrape_by, args.username, args.password, args.host, args.database
 
 
-def get_html(url, num_articles, from_date):
-    """Receives the url to coindesk.com.
+def by_number_of_articles(num_articles, browser):
+    """
+    opens the webpage by the number of articles needed
+    :param num_articles: number of articles
+    :param browser: browser driver
+    """
+    num_elements = 0
+    while num_elements < num_articles:
+        num_elements = len(browser.find_elements_by_class_name("text-content"))
+        try:
+            more_button = WebDriverWait(browser, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
+        except TimeoutException:
+            print("Articles did not load in time due to network.")
+            browser.close()
+            sys.exit(1)
+        more_button.click()
+        time.sleep(1)
+
+
+def by_date_of_articles(from_date, browser):
+    """
+    opens the webpage by the dates of the articles
+    :param from_date: date limit to scrape to
+    :param browser: browser driver
+    """
+    page_time = datetime.today()
+    while page_time > from_date:
+        date_published_text = browser.find_elements_by_class_name("time")[-1].text
+        if date_published_text.startswith(TODAY) or date_published_text[0].isdigit():
+            date_published_text = datetime.today().strftime(date_format)
+        elif date_published_text.startswith(YESTERDAY):
+            today = date.today()
+            date_published_text = (today - timedelta(days=1)).strftime(date_format)
+        page_time = datetime.strptime(date_published_text, date_format)
+        try:
+            more_button = WebDriverWait(browser, 10).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
+        except TimeoutException:
+            print("Articles did not load in time due to network.")
+            browser.close()
+            sys.exit(1)
+        more_button.click()
+        time.sleep(1)
+
+
+def get_html(url, scrape_by):
+    """
     Opens the url using Chrome driver.
     Clicks on the 'MORE' button several times.
-    Returns the page source code as html,"""
+    :param url: coindesk.com url
+    :param scrape_by: dictionary that details how to scrape
+    :return: the page source code as html
+    """
     browser = webdriver.Chrome()
     browser.get(url)
-
-    # TODO: maybe add dictionary parameter to split into more sub functions so this function will be more flexible
-    if from_date is None:
-        num_elements = 0
-        while num_elements < num_articles:
-            num_elements = len(browser.find_elements_by_class_name("text-content"))
-            try:
-                more_button = WebDriverWait(browser, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
-            except Exception:  # TODO make this exception not so general.
-                print("Articles did not load in time due to network.")
-                browser.close()
-                sys.exit(1)
-            more_button.click()
-            time.sleep(1)
-
-    else:
-        page_time = datetime.today()
-        while page_time > from_date:
-            date_published_text = browser.find_elements_by_class_name("time")[-1].text
-            if date_published_text.startswith('Today') or date_published_text[0].isdigit():
-                date_published_text = datetime.today().strftime('%b %d, %Y')
-            elif date_published_text.startswith('Yesterday'):
-                today = date.today()
-                date_published_text = (today - timedelta(days=1)).strftime('%b %d, %Y')
-            page_time = datetime.strptime(date_published_text, '%b %d, %Y')
-            try:
-                more_button = WebDriverWait(browser, 10).until(
-                    EC.presence_of_element_located((By.CLASS_NAME, "cta-story-stack")))
-            except Exception:  # TODO make this exception not so general.
-                print("Articles did not load in time due to network.")
-                browser.close()
-                sys.exit(1)
-            more_button.click()
-            time.sleep(1)
-
+    scrape_by[SCRAPE_BY_FUNCTION](scrape_by[SCRAPE_BY_PARAMETERS], browser)
     html = browser.page_source
     return html
 
@@ -254,30 +284,45 @@ def scrape_main(html):
     return links
 
 
-def scrape_articles(urls):  # TODO Add doc strings
-    # TODO: convert hardcoded strings to constants
+def scrape_articles(urls):
+    """
+    scraps all of the articles from the url list
+    :param urls: list of urls
+    :return: lists of article data
+    """
     responses = grequests.map((grequests.get(url) for url in urls))
     soups = [BeautifulSoup(response.content, 'html.parser') for response in responses]
     data_dicts = []
     # TODO: find better way to check for 404s?
     for soup in soups:
-        data = json.loads(soup.find('script', id='__NEXT_DATA__', type='application/json')
-                          .string)['props']['initialProps']['pageProps']
-        if 'data' not in data:  # article doesn't exist anymore (404 page)
+        props = json.loads(soup.find(SCRIPT_TAG, id=SCRIPT_ID, type=SCRIPT_TYPE).string)[PROPERTIES_TAG][
+            INITIAL_PROPERTIES_TAG][PAGE_PROPERTIES]
+        if DATA_TAG not in props:  # article doesn't exist anymore (404 page)
             continue
         else:
-            data_dicts.append(data['data'])
+            data_dicts.append(props[DATA_TAG])
 
-    titles = [data['headline'] for data in data_dicts]
-    summaries = [data['excerpt'] for data in data_dicts]
-    authors = [[author['name'] for author in data['authors']] for data in data_dicts]
-    tags = [[tag['name'] for tag in data['tags']] for data in data_dicts]
-    times_published = [datetime.strptime(data['published'], '%Y-%m-%dT%H:%M:%S') for data in data_dicts]
-    categories = [data['taxonomy']['category'] for data in data_dicts]
+    titles = [data[TITLE_TAG] for data in data_dicts]
+    summaries = [data[SUMMARY_TAG] for data in data_dicts]
+    authors = [[author[AUTHOR_NAME_TAG] for author in data[AUTHORS_TAG]] for data in data_dicts]
+    tags = [[tag[TAG_NAME_TAG] for tag in data[TAGS_TAG]] for data in data_dicts]
+    times_published = [datetime.strptime(data[PUBLISHED_DATE_TAG], PUBLISHED_DATE_FORMAT) for data in data_dicts]
+    categories = [data[TAXONOMY_TAG][CATEGORY_TAG] for data in data_dicts]
     return titles, summaries, authors, tags, times_published, categories
 
 
-def scraper(html, batch, num_arts, from_date, host, user, password, database):  # TODO Add doc strings
+def scraper(html, batch, scrape_by, user, password, host, database):
+    """
+    scrapes the html source code and save the data into the database in batches
+    :param html: string of html source code
+    :param batch: int size of batch
+    :param scrape_by: dictionary defining how to scrape
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    :return:
+    """
     links = scrape_main(html)
     links = list(split_list(links, batch))
 
@@ -295,11 +340,7 @@ def scraper(html, batch, num_arts, from_date, host, user, password, database):  
                 date_published=times_published[art_number],
                 categories=categories[art_number]
             )
-            if from_date is not None and new_article.get_date_published() <= from_date:
-                insert_batch(articles, batch, host, user, password, database)
-                return
-
-            elif from_date is None and new_article.get_article_id() >= num_arts:
+            if stop_condition(new_article, scrape_by):
                 insert_batch(articles, batch, host, user, password, database)
                 return
             print(new_article, '\n')
@@ -308,17 +349,50 @@ def scraper(html, batch, num_arts, from_date, host, user, password, database):  
 
 
 def split_list(lst, n):
+    """
+    Yields a generator with lists of n sizes chunks and a remainder if necessary
+    :param lst: list
+    :param n: int
+    :return:
+    """
     """Yields a generator with lists of n sizes chunks and a remainder if necessary"""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
 
-def insert_batch(articles, batch_size, host, user, password, database):  # TODO: docstrings
+def stop_condition(article, scrape_by):
+    """
+    stop condition for the loop of the scraping (because the html code has more articles than needed)
+    :param article: current article
+    :param scrape_by: dictionary defining how to scrape by
+    :return: boolean
+    """
+    if scrape_by[SCRAPE_BY_TYPE] == DATE_SCRAPE_TYPE:
+        return article.get_date_published() <= scrape_by[SCRAPE_BY_PARAMETERS]
+    if scrape_by[SCRAPE_BY_TYPE] == NUM_SCRAPE_TYPE:
+        return article.get_article_id() >= scrape_by[SCRAPE_BY_PARAMETERS]
+    return False
+
+
+def insert_batch(articles, batch_size, host, user, password, database):
+    """
+    insert into database a batch of articles
+    :param articles: list of articles
+    :param batch_size: int batch size (isn't really needed because the list is going to be batch size)
+    :param host: url of database server
+    :param user: username of mysql
+    :param password: password of mysql
+    :param database: database to save to
+    :return:
+    """
     with pymysql.connect(host=host, user=user, password=password, database=database,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
         count = 0
         for a in articles:
-            insert_data(a, connection_instance)
+            try:
+                insert_data(a, connection_instance)
+            except pymysql.err.IntegrityError as dup_err:
+                continue
             count += 1
             if count == batch_size:
                 connection_instance.commit()
@@ -326,47 +400,50 @@ def insert_batch(articles, batch_size, host, user, password, database):  # TODO:
         connection_instance.commit()
 
 
-def insert_data(article, conn):  # TODO: docstrings
-    # TODO: clean hardcoded strings and convert to constants, maybe find a way to reduce size of function
+def insert_data(article, conn):
+    """
+    save article to database
+    :param article: article to save
+    :param conn: connection object
+    :return:
+    """
+    # TODO: maybe find a way to reduce size of function?
     with conn.cursor() as cursor:
-        sql = f'''INSERT INTO {SUMMARIES_TABLE} (summary) 
-            VALUES (%s)'''
-        cursor.execute(sql, article.get_summary())
+        cursor.execute(INSERT_INTO_SUMMARIES, article.get_summary())
         summary_id = cursor.lastrowid
-        sql = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
-            VALUES (%s, %s, %s, %s)'''
-        cursor.execute(sql, [article.get_title(), summary_id, article.get_date_published(), article.get_link()])
-
+        cursor.execute(INSERT_INTO_ARTICLES,
+                       [article.get_title(), summary_id, article.get_date_published(), article.get_link()])
         article_id = cursor.lastrowid
+
         for author in article.get_authors():
-            cursor.execute(f'SELECT id FROM {AUTHORS_TABLE} WHERE name = "{author}"')
+            cursor.execute(FIND_AUTHOR, [author])
             result = cursor.fetchone()
             if result is None:
-                cursor.execute(f'INSERT INTO {AUTHORS_TABLE} (name) VALUES ("{author}")')
+                cursor.execute(INSERT_INTO_AUTHORS, [author])
                 author_id = cursor.lastrowid
             else:
-                author_id = result['id']
-            cursor.execute(f'INSERT INTO {AUTHORS_ARTICLES_TABLE} VALUES ({article_id},{author_id})')
+                author_id = result[AUTHOR_ID]
+            cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR, [article_id, author_id])
 
         for tag in article.get_tags():
-            cursor.execute(f'SELECT id FROM {TAGS_TABLE} WHERE name = "{tag}"')
+            cursor.execute(FIND_TAG, [tag])
             result = cursor.fetchone()
             if result is None:
-                cursor.execute(f'INSERT INTO {TAGS_TABLE} (name) VALUES ("{tag}")')
+                cursor.execute(INSERT_INTO_TAGS, [tag])
                 tag_id = cursor.lastrowid
             else:
-                tag_id = result['id']
-            cursor.execute(f'INSERT INTO {TAGS_ARTICLES_TABLE} VALUES ({article_id},{tag_id})')
+                tag_id = result[TAG_ID]
+            cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_TAG, [article_id, tag_id])
 
         for category in article.get_categories():
-            cursor.execute(f'SELECT id FROM {CATEGORIES_TABLE} WHERE category = "{category}"')
+            cursor.execute(FIND_CATEGORY, [category])
             result = cursor.fetchone()
             if result is None:
-                cursor.execute(f'INSERT INTO {CATEGORIES_TABLE} (category) VALUES ("{category}")')
+                cursor.execute(INSERT_INTO_CATEGORY, [category])
                 category_id = cursor.lastrowid
             else:
-                category_id = result['id']
-            cursor.execute(f'INSERT INTO {CATEGORIES_ARTICLES_TABLE} VALUES ({article_id},{category_id})')
+                category_id = result[CATEGORY_ID]
+            cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY, [article_id, category_id])
 
 
 def main():
@@ -375,9 +452,9 @@ def main():
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     before = time.time()
-    section, num_arts, category, from_date = welcome()
-    html = get_html(URL + section, num_arts, from_date)
-    scraper(html, BATCH, num_arts, from_date, HOST, USER, 'Dungeon!995', DATABASE)
+    section, scrap_by, username, password, host, database = welcome()
+    html = get_html(URL + section, scrap_by)
+    scraper(html, BATCH, scrap_by, username, password, host, database)
     after = time.time()
     print(f"\nScraping took {round(after - before, 3)} seconds.")
 
