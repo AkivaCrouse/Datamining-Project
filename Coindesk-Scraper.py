@@ -148,20 +148,28 @@ def welcome():
         'latest': '/news',
     }
     coindesk_reader = MyParser(add_help=False)
+    date_or_num = coindesk_reader.add_mutually_exclusive_group(required=True)
     coindesk_reader.add_argument('section', type=str.lower, metavar='section',
                                  help='Choose one of the following sections: latest, tech, business, regulation, people, '
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
-    coindesk_reader.add_argument('num_articles', type=float, metavar='num_articles',
-                                 help=f'Number of articles, from 1 to {MAX_ARTICLES}',
+    date_or_num.add_argument('-num', type=float, metavar='num_articles',
+                                 help=f'You can choose one of the two options: -num or -date.'
+                                      f'\nChoose number of articles, from 1 to {MAX_ARTICLES} '
+                                      f'in "-num [your number]" format.',
                                  choices=list(range(1, MAX_ARTICLES + 1)))
-    coindesk_reader.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
-                                 help=f'Enter Date in "-date YYYY-MM-DD" format. '
+    date_or_num.add_argument('-date', type=lambda s: datetime.strptime(s, '%Y-%m-%d'), metavar='from_date',
+                                 help=f'You can choose one of the two options: -num or -date. '
+                                      f' Enter Date in "-date YYYY-MM-DD" format. '
                                       f'You will get articles published after that date')
+
     args = coindesk_reader.parse_args()
+    print(args)
     section = args.section
-    num_articles = int(args.num_articles)
+
+    num_articles = int(args.num) if (args.num is not None) else args.num
     from_date = args.date
+
     # Validating date is not too far back nor in the future
     if from_date is not None:
         now = datetime.today()
