@@ -38,9 +38,10 @@ Install dependencies
 ```
 
 Run the program
+You can choose to scrape by number of article or by date and you'll the atricle from this date forward.
 
 ```bash
-  Coindesk-Scraper.py [ENTER SECTION] [ENTER REQUIRED NUMBER OF ARTICLES]
+  Coindesk-Scraper.py [ENTER CATEGORY] -[NUM or DATE] [REQUIRED NUMBER OF ARTICLES or DATE IN YYYY-MM-DD FORMAT]
 ```
 
   
