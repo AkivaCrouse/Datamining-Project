@@ -1,6 +1,7 @@
 beautifulsoup4==4.9.3
 bs4==0.0.1
 certifi==2021.5.30
+cryptography==3.4.7
 chardet==4.0.0
 gevent==21.1.2
 greenlet==1.1.0
