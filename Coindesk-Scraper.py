@@ -37,7 +37,7 @@ class Article:
 
         Attributes
         ----------
-        article_id : int
+        article_num : int
             Number article instance created.
         title: str
             Article title.
@@ -51,23 +51,44 @@ class Article:
             Article hashtags.
         date_published: datetime
             Date and time article was published.
+        categories: (str)
+            Categories article falls under.
+
+
         Methods
         -------
-        set_tags_and_date(article_link):
-            Receives the article url and sets the tags and date published
-        get_link():
-            Returns article link (str)
-        get_article_id(self):
-            Returns article id (int)
+        get_article_num():
+            Returns article number of instance created.
+
+        get_title(self):
+            Returns article title
+
+        get_summary(self):
+            Returns article summary
+
+        get_link(self):
+            Returns URL to article page
+
+        get_tags(self):
+            Returns article tags
+
+        get_date_published(self):
+            Returns date and time article was published
+
+        get_categories(self):
+            Returns article category
+
+        get_authors(self):
+            Returns article author(s)
         """
-    article_id = 0  # TODO change article_id to article_num
+    article_num = 0
 
     def __init__(self, title, summary, author, link, tags, date_published, categories):
         """
         Constructs all necessary attributes of the vehicle object.
         """
-        Article.article_id += 1
-        self.article_id = Article.article_id
+        Article.article_num += 1
+        self.article_num = Article.article_num
         self.title = title
         self.summary = summary
         self.author = author
@@ -90,12 +111,12 @@ class Article:
             ['Tags', ', '.join(self.tags)],
             ['Date/Time Published', self.date_published]
         ],
-            headers=['#', self.article_id],
+            headers=['#', self.article_num],
             tablefmt='plain')
 
-    def get_article_id(self):
-        """:return: article id (int)"""
-        return self.article_id
+    def get_article_num(self):
+        """:return: article number (int)"""
+        return self.article_num
 
     def get_title(self):
         """:return: article title (str)"""
@@ -147,10 +168,10 @@ class MyParser(argparse.ArgumentParser):
 
 def welcome():
     """
-    Gets the section and number of articles required by the user, with argparser,
+    Gets the category and number of articles required by the user, with argparser,
     and outputs the relevant URL suffix for these articles together with the number of articles.
     the program also response to the flag -h for help.
-    return:    section: relevant section URL suffix.
+    return:    category: relevant category URL suffix.
                scrape_by: number of articles requested by the user
                username: username for mysql
                password: password for mysql
@@ -158,7 +179,7 @@ def welcome():
                database: database that the program is going to save the data to
     """
 
-    section_dict = {
+    category_dict = {
         'tech': DEFAULT_PREFIX + 'tech',
         'business': DEFAULT_PREFIX + 'business',
         'people': DEFAULT_PREFIX + 'people',
@@ -170,8 +191,9 @@ def welcome():
     }
     coindesk_reader = MyParser(add_help=False)
     date_or_num = coindesk_reader.add_mutually_exclusive_group(required=True)
-    coindesk_reader.add_argument('section', type=str.lower, metavar='section',
-                                 help='Choose one of the following sections: latest, tech, business, regulation, people, '
+    coindesk_reader.add_argument('category', type=str.lower, metavar='category',
+                                 help='Choose one of the following categories: '
+                                      'latest, tech, business, regulation, people, '
                                       'features, opinion, markets.',
                                  choices=['latest', 'tech', 'business', 'regulation', 'people', 'opinion', 'markets'])
     date_or_num.add_argument('-num', type=int, metavar='num_articles',
@@ -189,7 +211,7 @@ def welcome():
     coindesk_reader.add_argument('-db', '--database', help='Name of database to insert to', default=DATABASE)
 
     args = coindesk_reader.parse_args()
-    section = args.section
+    category = args.category
     scrape_by = {}
     if args.num is not None:
         scrape_by[SCRAPE_BY_TYPE] = NUM_SCRAPE_TYPE
@@ -208,7 +230,7 @@ def welcome():
         scrape_by[SCRAPE_BY_FUNCTION] = by_date_of_articles
         scrape_by[SCRAPE_BY_PARAMETERS] = from_date
 
-    return section_dict[section], scrape_by, args.username, args.password, args.host, args.database
+    return category_dict[category], scrape_by, args.username, args.password, args.host, args.database
 
 
 def by_number_of_articles(num_articles, browser):
@@ -382,7 +404,7 @@ def stop_condition(article, scrape_by):
     if scrape_by[SCRAPE_BY_TYPE] == DATE_SCRAPE_TYPE:
         return article.get_date_published() <= scrape_by[SCRAPE_BY_PARAMETERS]
     if scrape_by[SCRAPE_BY_TYPE] == NUM_SCRAPE_TYPE:
-        return article.get_article_id() >= scrape_by[SCRAPE_BY_PARAMETERS]
+        return article.get_article_num() >= scrape_by[SCRAPE_BY_PARAMETERS]
     return False
 
 
@@ -477,13 +499,13 @@ def insert_data(article, conn):
 
 
 def main():
-    """Receives Coindesk topic section and number of articles to print as command parameters.
+    """Receives Coindesk topic category and number of articles to print as command parameters.
     Uses selenium to retrieve the required html script.
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     before = time.time()
-    section, scrap_by, username, password, host, database = welcome()
-    html = get_html(URL + section, scrap_by)
+    category, scrap_by, username, password, host, database = welcome()
+    html = get_html(URL + category, scrap_by)
     scraper(html, BATCH, scrap_by, username, password, host, database)
     after = time.time()
     print(f"\nScraping took {round(after - before, 3)} seconds.")
