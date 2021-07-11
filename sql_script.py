@@ -93,7 +93,8 @@ def reset_database(user, password, host, database):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--username', help='username of mysql', default=USER)
-    parser.add_argument('-p', '--password', help='password of mysql', required=True)
+    required = parser.add_argument_group('required arguments')
+    required.add_argument('-p', '--password', help='password of mysql', required=True)
     parser.add_argument('-host', help='url of database server', default=HOST)
     parser.add_argument('-db', '--database', help='Name of database to create', default=DATABASE)
     parser.add_argument('--print', help='Show the created DB and its tables', action='store_true')

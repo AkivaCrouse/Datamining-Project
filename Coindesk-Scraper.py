@@ -190,6 +190,7 @@ def welcome():
         'latest': '/news',
     }
     coindesk_reader = MyParser(add_help=False)
+
     date_or_num = coindesk_reader.add_mutually_exclusive_group(required=True)
     coindesk_reader.add_argument('category', type=str.lower, metavar='category',
                                  help='Choose one of the following categories: '
@@ -206,7 +207,8 @@ def welcome():
                                   f' Enter Date in "-date YYYY-MM-DD" format. '
                                   f'You will get articles published after that date')
     coindesk_reader.add_argument('-u', '--username', help='username of mysql', default=USER)
-    coindesk_reader.add_argument('-p', '--password', help='password of mysql', required=True)
+    required = coindesk_reader.add_argument_group('required arguments')
+    required.add_argument('-p', '--password', help='password of mysql', required=True)
     coindesk_reader.add_argument('-host', help='url of database server', default=HOST)
     coindesk_reader.add_argument('-db', '--database', help='Name of database to insert to', default=DATABASE)
 

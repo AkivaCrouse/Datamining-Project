@@ -37,10 +37,11 @@ Install dependencies
   pip install -r requirements.txt
 ```
 
-Run the program
+Run the program.
+You can choose to scrape by number of article or by date and you'll the atricle from this date forward.
 
 ```bash
-  Coindesk-Scraper.py [ENTER SECTION] [ENTER REQUIRED NUMBER OF ARTICLES]
+  Coindesk-Scraper.py [ENTER CATEGORY] -[NUM or DATE] [REQUIRED NUMBER OF ARTICLES or DATE IN YYYY-MM-DD FORMAT]
 ```
 
   
@@ -56,4 +57,5 @@ Run the program
 
 - [@AkivaCrouse](https://github.com/AkivaCrouse)
 - [@Ohad95](https://www.github.com/Ohad95)
+- [@metalbored](https://github.com/metalbored)
   
