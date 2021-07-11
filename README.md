@@ -6,11 +6,11 @@ CoinDesk is a news site specializing in bitcoin and digital currencies. Shakil K
 #### Purpose:
 The purpose of this project is to collect data that, when analyzed further, may reveal trends regarding articles.
 Upon entering the desired section and the number of scroll downs (each scroll-down will add about 9 articles), the program will output the metadata about the relevant articles.
-On each article, the following metadata is collected:
-The title, author, date, tags, and a short description.
+On each article, the following metadata is collected:\
+The title, author, date, tags, category and a short summary.
 
 #### Technology:
-There are two main technologies in this project:
+There are three main technologies used in this project:
 
 Beautiful Soup - 
 Beautiful Soup is a Python package for parsing HTML and XML documents. It creates a parse tree for parsed pages that can be used to extract data from HTML, which is useful for web scraping. We scraped the metadata of the articles using it.
@@ -18,6 +18,8 @@ Beautiful Soup is a Python package for parsing HTML and XML documents. It create
 Selenium - 
 Selenium WebDriver is a collection of open source APIs which are used to automate the testing of a web application. We used it to automate the CoinDesk website navigation and make scraping faster.
 
+PyMySQL -
+PyMySQL is an interface for connecting to a MySQL database server from Python. It implements the Python Database API v2. 0 and contains a pure-Python MySQL client library. The goal of PyMySQL is to be a drop-in replacement for MySQLdb.
 
 ## Run Locally
 
@@ -37,11 +39,41 @@ Install dependencies
   pip install -r requirements.txt
 ```
 
-Run the program.
-You can choose to scrape by number of article or by date and you'll the atricle from this date forward.
+Initialize the database
 
 ```bash
-  Coindesk-Scraper.py [ENTER CATEGORY] -[NUM or DATE] [REQUIRED NUMBER OF ARTICLES or DATE IN YYYY-MM-DD FORMAT]
+  sql_script.py [-h] [-u USERNAME] -p PASSWORD [-host HOST] [-db DATABASE] [--print] [--delete] [--reset]
+```
+positional arguments:\
+  category              Choose one of the following categories: latest, tech,
+                        business, regulation, people, features, opinion,
+                        markets.
+
+optional arguments:\
+  -num num_articles     You can choose one of the two options: -num or -date.
+                        Choose number of articles, from 1 to 1000 in "-num
+                        [your number]" format.\
+  -date from_date       You can choose one of the two options: -num or -date.
+                        Enter Date in "-date YYYY-MM-DD" format. You will get
+                        articles published after that date\
+  -u USERNAME, --username USERNAME
+                        username of mysql
+  -host HOST            url of database server
+  -db DATABASE, --database DATABASE
+                        Name of database to insert to
+
+required arguments:\
+  -p PASSWORD, --password PASSWORD
+                        password of mysql\
+
+
+
+
+Run the program
+
+```bash
+  Coindesk-Scraper.py (-num num_articles | -date from_date) [-u USERNAME]
+                           -p PASSWORD [-host HOST] [-db DATABASE] category
 ```
 
   
