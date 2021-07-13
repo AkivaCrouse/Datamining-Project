@@ -440,6 +440,14 @@ def insert_batch(articles, batch_size, host, user, password, database):
 
 
 def insert_data_to_entity_table(sql, data, cursor, log_msg):
+    """
+    inserts one entity to its respective table
+    :param sql: the sql insert command
+    :param data: the data we're inserting
+    :param cursor: the cursor object
+    :param log_msg: the log message we want to save to the log file
+    :return: returns the id of the row
+    """
     cursor.execute(sql, data)
     coin_logger.info(log_msg)
     return cursor.lastrowid
@@ -447,6 +455,20 @@ def insert_data_to_entity_table(sql, data, cursor, log_msg):
 
 def insert_many_to_many_entities(create_single_sql, find_sql, create_relationship_sql, entity_pk_name, partner_pk, data,
                                  cursor, log_msg, log_single_entity, debug_msg):
+    """
+    saves the entities of a many to many relationship to their respective tables and their relationship table
+    :param create_single_sql: the sql insert single entity command
+    :param find_sql: find the specific entity (to remove duplicates)
+    :param create_relationship_sql: the sql insert relationship command
+    :param entity_pk_name: the private key name of the entity
+    :param partner_pk: the partner private key (that we're making the relationship with)
+    :param data: the data
+    :param cursor: the cursor object
+    :param log_msg: the log message when a relationship is created
+    :param log_single_entity: the log message when a entity is created
+    :param debug_msg: the debug message when the entity already exists
+    :return:
+    """
     for data_point in data:
         cursor.execute(find_sql, [data_point])
         result = cursor.fetchone()
