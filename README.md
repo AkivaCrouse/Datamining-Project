@@ -6,8 +6,10 @@ CoinDesk is a news site specializing in bitcoin and digital currencies. Shakil K
 #### Purpose:
 The purpose of this project is to collect data that, when analyzed further, may reveal trends regarding articles.
 Upon entering the desired section and the number of scroll downs (each scroll-down will add about 9 articles), the program will output the metadata about the relevant articles.
-On each article, the following metadata is collected:\
+On each article, the following metadata is collected and stored:\
 The title, author, date, tags, category and a short summary.
+
+![alt text](DB_design.JPG)
 
 #### Technology:
 There are three main technologies used in this project:
