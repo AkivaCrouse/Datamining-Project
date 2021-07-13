@@ -426,12 +426,8 @@ def insert_batch(articles, batch_size, host, user, password, database):
                              cursorclass=pymysql.cursors.DictCursor) as connection_instance:
             count = 0
             for a in articles:
-                try:
-                    insert_data(a, connection_instance)
-                except pymysql.err.IntegrityError:
-                    coin_logger.warning(f'Duplicate data, will skip this article: {a.get_link()}.')
-                    continue
-                count += 1
+                if insert_data(a, connection_instance):
+                    count += 1
                 if count == batch_size:
                     connection_instance.commit()
                     count = 0
@@ -443,61 +439,65 @@ def insert_batch(articles, batch_size, host, user, password, database):
         exit(1)
 
 
+def insert_data_to_entity_table(sql, data, cursor, log_msg):
+    cursor.execute(sql, data)
+    coin_logger.info(log_msg)
+    return cursor.lastrowid
+
+
+def insert_many_to_many_entities(create_single_sql, find_sql, create_relationship_sql, entity_pk_name, partner_pk, data,
+                                 cursor, log_msg, log_single_entity, debug_msg):
+    for data_point in data:
+        cursor.execute(find_sql, [data_point])
+        result = cursor.fetchone()
+        if result is None:
+            cursor.execute(create_single_sql, [data_point])
+            coin_logger.info(log_single_entity)
+            data_point_id = cursor.lastrowid
+        else:
+            data_point_id = result[entity_pk_name]
+            coin_logger.debug(debug_msg)
+        cursor.execute(create_relationship_sql, [partner_pk, data_point_id])
+        coin_logger.info(log_msg)
+
+
 def insert_data(article, conn):
     """
     save article to database
     :param article: article to save
     :param conn: connection object
-    :return:
+    :return: boolean if inserted new data
     """
-    # TODO: maybe find a way to reduce size of function?
-    with conn.cursor() as cursor:
-        cursor.execute(INSERT_INTO_SUMMARIES, article.get_summary())
-        coin_logger.info('Saved summary to database.')
-        summary_id = cursor.lastrowid
-        cursor.execute(INSERT_INTO_ARTICLES,
-                       [article.get_title(), summary_id, article.get_date_published(), article.get_link()])
-        coin_logger.info('Saved article to database.')
-        article_id = cursor.lastrowid
+    try:
+        with conn.cursor() as cursor:
+            summary_id = insert_data_to_entity_table(INSERT_INTO_SUMMARIES,
+                                                     article.get_summary(), cursor, 'Saved summary to database.')
+            article_id = insert_data_to_entity_table(INSERT_INTO_ARTICLES,
+                                                     [article.get_title(), summary_id, article.get_date_published(),
+                                                      article.get_link()],
+                                                     cursor, 'Saved article to database.')
 
-        for author in article.get_authors():
-            cursor.execute(FIND_AUTHOR, [author])
-            result = cursor.fetchone()
-            if result is None:
-                cursor.execute(INSERT_INTO_AUTHORS, [author])
-                coin_logger.info('Saved author to database.')
-                author_id = cursor.lastrowid
-            else:
-                author_id = result[AUTHOR_ID]
-                coin_logger.debug('Author exists already in database.')
-            cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR, [article_id, author_id])
-            coin_logger.info('Saved author-article relationship to database.')
+            insert_many_to_many_entities(INSERT_INTO_AUTHORS, FIND_AUTHOR, INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR,
+                                         AUTHOR_ID, article_id, article.get_authors(), cursor,
+                                         'Saved author-article relationship to database.',
+                                         'Saved author to database.',
+                                         'Author exists already in database.')
 
-        for tag in article.get_tags():
-            cursor.execute(FIND_TAG, [tag])
-            result = cursor.fetchone()
-            if result is None:
-                cursor.execute(INSERT_INTO_TAGS, [tag])
-                coin_logger.info('Saved tag to database.')
-                tag_id = cursor.lastrowid
-            else:
-                tag_id = result[TAG_ID]
-                coin_logger.debug('Tag exists already in database.')
-            cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_TAG, [article_id, tag_id])
-            coin_logger.info('Saved tag-article relationship to database.')
+            insert_many_to_many_entities(INSERT_INTO_TAGS, FIND_TAG, INSERT_INTO_RELATIONSHIP_ARTICLE_TAG,
+                                         TAG_ID, article_id, article.get_tags(), cursor,
+                                         'Saved tag-article relationship to database.',
+                                         'Saved tag to database.',
+                                         'Tag exists already in database.')
 
-        for category in article.get_categories():
-            cursor.execute(FIND_CATEGORY, [category])
-            result = cursor.fetchone()
-            if result is None:
-                cursor.execute(INSERT_INTO_CATEGORY, [category])
-                coin_logger.info('Saved category to database.')
-                category_id = cursor.lastrowid
-            else:
-                category_id = result[CATEGORY_ID]
-                coin_logger.debug('Category exists already in database.')
-            cursor.execute(INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY, [article_id, category_id])
-            coin_logger.info('Saved category-article relationship to database.')
+            insert_many_to_many_entities(INSERT_INTO_CATEGORY, FIND_CATEGORY, INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY,
+                                         CATEGORY_ID, article_id, article.get_categories(), cursor,
+                                         'Saved category-article relationship to database.',
+                                         'Saved category to database.',
+                                         'Category exists already in database.')
+        return True
+    except pymysql.err.IntegrityError:
+        coin_logger.warning(f'Duplicate data, will skip this article: {article.get_link()}.')
+        return False
 
 
 def main():
