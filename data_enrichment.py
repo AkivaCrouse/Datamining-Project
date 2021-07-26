@@ -20,14 +20,20 @@ def get_top_ten_regions(tag):
     Returns: DataFrame of top 10 regions in which it was searched
     -------
     """
-    pytrend = TrendReq()
+    try:
+        pytrend = TrendReq()
+    except OSError as error:
+        print(error)
+        print('Unstable internet connection')
+        return
+
     pytrend.build_payload(kw_list=[tag])
     interest_by_region_df = pytrend.interest_by_region()
     return interest_by_region_df.sort_values(by=tag, ascending=False).head(10)
 
 
 def main():
-    print(get_top_ten_regions('Blockchain'))
+    print(get_top_ten_regions('NFT'))
     pass
 
 
