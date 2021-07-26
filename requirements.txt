@@ -20,3 +20,5 @@ tabulate==0.8.9
 urllib3==1.26.6
 zope.event==4.5.0
 zope.interface==5.4.0
+argparse~=1.4.0
+pytrends~=4.7.3
