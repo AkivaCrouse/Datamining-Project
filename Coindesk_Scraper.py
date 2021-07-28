@@ -548,6 +548,16 @@ def select_top_ten_tags(user, password, host, database):
 
 
 def enrich_tags(batch_size, user, password, host, database):
+    """
+    enriches the database with articles from different sources that share a
+    tag from the top ten tags in the database currently
+    :param batch_size: batch size of article to insert to database
+    :param user: user for database
+    :param password: password for database
+    :param host: host url of database
+    :param database: database name
+    :return:
+    """
     df = select_top_ten_tags(user, password, host, database)
     for tag in df.tag:
         print('Enriching', tag, 'tag:')
@@ -568,7 +578,7 @@ def main():
     html = get_html(URL + category, scrap_by)
     scraper(html, BATCH, scrap_by, username, password, host, database)
     after = time.time()
-    # enrich_tags(10, username, password, host, database)
+    enrich_tags(10, username, password, host, database)
     print(f"\nScraping took {round(after - before, 3)} seconds.")
 
 

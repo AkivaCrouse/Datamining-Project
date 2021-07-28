@@ -2,8 +2,6 @@ import logging
 
 # news_api constants
 API_KEY = 'fece1de5cfde4f2d9d004ae04dcf8217'
-API_DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-# 2021-07-28T11:30:00Z
 
 # logging defaults
 COIN_DESK_LOG_FILE = 'coindesk.log'
@@ -170,3 +168,15 @@ SCRAPE_BY_FUNCTION = 'function'
 SCRAPE_BY_PARAMETERS = 'parameters'
 NUM_SCRAPE_TYPE = 'num'
 DATE_SCRAPE_TYPE = 'date'
+
+# Enrichment json constants
+API_DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+ENRICHMENT_ARTICLES = 'articles'
+ENRICHMENT_AUTHOR = 'author'
+ENRICHMENT_DESCRIPTION = 'description'
+ENRICHMENT_TITLE = 'title'
+ENRICHMENT_URL = 'url'
+ENRICHMENT_PUBLISH_DATE = 'publishedAt'
+ENRICHMENT_SOURCE = 'source'
+ENRICHMENT_SOURCE_NAME = 'name'
+ENRICHMENT_CATEGORY = 'Enriched data'
