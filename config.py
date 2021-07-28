@@ -37,16 +37,16 @@ enrichment_logger.addHandler(file_handler)
 # SQL defaults
 HOST = 'localhost'
 USER = 'root'
-DATABASE = 'Coindesk'
+DATABASE = 'coindesk'
 # Table names
-ARTICLES_TABLE = 'Articles'
-AUTHORS_TABLE = 'Authors'
-SUMMARIES_TABLE = 'Summaries'
-TAGS_TABLE = 'Tags'
-CATEGORIES_TABLE = 'Categories'
-TAGS_ARTICLES_TABLE = 'Tags_in_articles'
-AUTHORS_ARTICLES_TABLE = 'Authors_in_articles'
-CATEGORIES_ARTICLES_TABLE = 'Categories_in_articles'
+ARTICLES_TABLE = 'articles'
+AUTHORS_TABLE = 'authors'
+SUMMARIES_TABLE = 'summaries'
+TAGS_TABLE = 'tags'
+CATEGORIES_TABLE = 'categories'
+TAGS_ARTICLES_TABLE = 'tags_in_articles'
+AUTHORS_ARTICLES_TABLE = 'authors_in_articles'
+CATEGORIES_ARTICLES_TABLE = 'categories_in_articles'
 
 # SQL Creation Scripts
 CREATE_DATABASE = 'CREATE DATABASE IF NOT EXISTS '
