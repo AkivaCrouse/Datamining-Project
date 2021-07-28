@@ -92,12 +92,12 @@ def reset_database(user, password, host, database):
 
 def select_top_ten_tags(user, password, host, database):
     """
-    present the database data
+    Retrieves the ten most popular tags and returns a dataframe.
     :param user: username of mysql
     :param password: password of mysql
     :param host: url of database server
     :param database: database to save to
-    :return:
+    :return: dataframe of 10 most popular tags and their respective tag counts.
     """
     with pymysql.connect(host=host, user=user, password=password, database=database,
                          cursorclass=pymysql.cursors.DictCursor) as connection_instance:
