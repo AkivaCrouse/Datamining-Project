@@ -66,6 +66,7 @@ ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO
             publication_date TIMESTAMP,
             url VARCHAR(300) UNIQUE,
             summary_id INT UNIQUE NOT NULL,
+            source VARCHAR(100),
             FOREIGN KEY(summary_id) REFERENCES {SUMMARIES_TABLE}(id)
             )
             """
@@ -95,8 +96,8 @@ CATEGORIES_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATE
 
 # SQL INSERT scripts
 INSERT_INTO_SUMMARIES = f'''INSERT INTO {SUMMARIES_TABLE} (summary) VALUES (%s)'''
-INSERT_INTO_ARTICLES = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url)
-            VALUES (%s, %s, %s, %s)'''
+INSERT_INTO_ARTICLES = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url,source)
+            VALUES (%s, %s, %s, %s, %s)'''
 FIND_AUTHOR = f'SELECT id FROM {AUTHORS_TABLE} WHERE name = %s'
 INSERT_INTO_AUTHORS = f'INSERT INTO {AUTHORS_TABLE} (name) VALUES (%s)'
 INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR = f'INSERT INTO {AUTHORS_ARTICLES_TABLE} VALUES (%s, %s)'

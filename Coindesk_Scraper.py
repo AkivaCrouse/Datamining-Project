@@ -503,7 +503,7 @@ def insert_data(article, conn):
                                                      article.get_summary(), cursor, 'Saved summary to database.')
             article_id = insert_data_to_entity_table(INSERT_INTO_ARTICLES,
                                                      [article.get_title(), summary_id, article.get_date_published(),
-                                                      article.get_link()],
+                                                      article.get_link(), article.get_source()],
                                                      cursor, 'Saved article to database.')
 
             insert_many_to_many_entities(INSERT_INTO_AUTHORS, FIND_AUTHOR, INSERT_INTO_RELATIONSHIP_ARTICLE_AUTHOR,
