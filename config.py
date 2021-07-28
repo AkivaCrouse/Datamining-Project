@@ -1,4 +1,8 @@
 import logging
+
+# news_api key
+API_KEY = 'fece1de5cfde4f2d9d004ae04dcf8217'
+
 # logging defaults
 COIN_DESK_LOG_FILE = 'coindesk.log'
 SQL_LOG_FILE = 'sql.log'
