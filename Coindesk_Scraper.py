@@ -196,6 +196,7 @@ def welcome():
         'opinion': '/opinion',
         'latest': '/news',
     }
+
     coindesk_reader = MyParser(add_help=False)
 
     date_or_num = coindesk_reader.add_mutually_exclusive_group(required=True)
@@ -214,32 +215,54 @@ def welcome():
                                   f' Enter Date in "-date YYYY-MM-DD" format. '
                                   f'You will get articles published after that date')
     coindesk_reader.add_argument('-u', '--username', help='username of mysql', default=USER)
+    coindesk_reader.add_argument('-$', '--enrich', help='Data enrichment with articles from other sources.'
+                                                        ' 1 = Enrich, 0 = Do not enrich',type=lambda x:int(x),
+                                 default=0, choices=[1, 0])
+
     required = coindesk_reader.add_argument_group('required arguments')
     required.add_argument('-p', '--password', help='password of mysql', required=True)
     coindesk_reader.add_argument('-host', help='url of database server', default=HOST)
     coindesk_reader.add_argument('-db', '--database', help='Name of database to insert to', default=DATABASE)
 
     args = coindesk_reader.parse_args()
-    category = args.category
-    scrape_by = {}
+    scrape_by = handle_args_num_and_date(coindesk_reader, args)
+
+    return category_dict[args.category], scrape_by, args.username, args.password, args.host, args.database, args.enrich
+
+
+def handle_args_num_and_date(parser, args):
+    """
+    Check if the user wants to scrape by number of articles or by date. This function will make sure the date is valid,
+    and will set up the scrape configuration.
+
+    Parameters
+    ----------
+    date: Datetime: User input
+    parser: The parser for messaging errors
+    args: arguments given by the user
+
+    Returns: scrape_config: dict: configurations for the scrape.
+    -------
+
+    """
+    scrape_config = {}
+
     if args.num is not None:
-        scrape_by[SCRAPE_BY_TYPE] = NUM_SCRAPE_TYPE
-        scrape_by[SCRAPE_BY_FUNCTION] = by_number_of_articles
-        scrape_by[SCRAPE_BY_PARAMETERS] = int(args.num)
+        scrape_config[SCRAPE_BY_TYPE] = NUM_SCRAPE_TYPE
+        scrape_config[SCRAPE_BY_FUNCTION] = by_number_of_articles
+        scrape_config[SCRAPE_BY_PARAMETERS] = int(args.num)
 
-    from_date = args.date
-    # Validating date is not too far back nor in the future
-    if from_date is not None:
+    elif args.date is not None:
         now = datetime.today()
-        if from_date > now:
-            coindesk_reader.error("The date is the future, please enter another date")
-        if abs((from_date - now).days) > 365:
-            coindesk_reader.error("The date you entered is too far back, please enter a date within the last 365 days")
-        scrape_by[SCRAPE_BY_TYPE] = DATE_SCRAPE_TYPE
-        scrape_by[SCRAPE_BY_FUNCTION] = by_date_of_articles
-        scrape_by[SCRAPE_BY_PARAMETERS] = from_date
+        if args.date > now:
+            parser.error("The date is the future, please enter another date")
+        if abs((args.date - now).days) > 365:
+            parser.error("The date you entered is too far back, please enter a date within the last 365 days")
+        scrape_config[SCRAPE_BY_TYPE] = DATE_SCRAPE_TYPE
+        scrape_config[SCRAPE_BY_FUNCTION] = by_date_of_articles
+        scrape_config[SCRAPE_BY_PARAMETERS] = args.date
 
-    return category_dict[category], scrape_by, args.username, args.password, args.host, args.database
+    return scrape_config
 
 
 def by_number_of_articles(num_articles, browser):
@@ -539,35 +562,19 @@ def select_top_ten_tags(user, password, host, database):
     :param database: database to save to
     :return: dataframe of 10 most popular tags and their respective tag counts.
     """
-    try:
-        with pymysql.connect(host=host, user=user, password=password, database=database,
-                             cursorclass=pymysql.cursors.DictCursor) as connection_instance:
-            with connection_instance.cursor() as cursor:
-                cursor.execute(TOP_TEN_TAGS)
-                results = cursor.fetchall()
-                return pd.DataFrame(results)
-    except pymysql.err.Error as err:
-        print(err.args)
-        coin_logger.error(err.args)
-        exit(1)
+    with pymysql.connect(host=host, user=user, password=password, database=database,
+                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+        with connection_instance.cursor() as cursor:
+            cursor.execute(TOP_TEN_TAGS)
+            results = cursor.fetchall()
+            return pd.DataFrame(results)
 
 
 def enrich_tags(batch_size, user, password, host, database):
-    """
-    enriches the database with articles from different sources that share a
-    tag from the top ten tags in the database currently
-    :param batch_size: batch size of article to insert to database
-    :param user: user for database
-    :param password: password for database
-    :param host: host url of database
-    :param database: database name
-    :return:
-    """
     df = select_top_ten_tags(user, password, host, database)
     for tag in df.tag:
         print('Enriching', tag, 'tag:')
         articles = enrichment_api.enrich_tag(tag)
-        coin_logger.info(f'Enriched tag {tag}')
         for a in articles:
             print(a, '\n')
 
@@ -580,11 +587,12 @@ def main():
     Scrapes and prints each article for the following data:
         Title, Summary, Author, Link, Tags and Date-Time"""
     before = time.time()
-    category, scrap_by, username, password, host, database = welcome()
+    category, scrap_by, username, password, host, database, enrich = welcome()
     html = get_html(URL + category, scrap_by)
     scraper(html, BATCH, scrap_by, username, password, host, database)
     after = time.time()
-    # enrich_tags(10, username, password, host, database)
+    if enrich:
+        enrich_tags(10, username, password, host, database)
     print(f"\nScraping took {round(after - before, 3)} seconds.")
 
 
