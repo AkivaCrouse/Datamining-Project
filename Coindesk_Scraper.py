@@ -83,7 +83,7 @@ class Article:
         """
     article_num = 0
 
-    def __init__(self, title, summary, author, link, tags, date_published, categories):
+    def __init__(self, title, summary, author, link, tags, date_published, categories, source):
         """
         Constructs all necessary attributes of the vehicle object.
         """
@@ -96,6 +96,7 @@ class Article:
         self.tags = tags
         self.date_published = date_published
         self.categories = categories
+        self.source = source
 
     def __str__(self):
         """
@@ -106,6 +107,7 @@ class Article:
             ['Title', self.title],
             ['Summary', '\n'.join(tw.wrap(self.summary, width=90))],
             ['Author', ', '.join(self.author)],
+            ['Source', self.source],
             ['Categories', ', '.join(self.categories)],
             ['Link', self.link],
             ['Tags', ', '.join(self.tags)],
@@ -145,6 +147,10 @@ class Article:
     def get_authors(self):
         """:return: the authors that wrote the article"""
         return self.author
+
+    def get_source(self):
+        """:return: the source that the article came from"""
+        return self.source
 
 
 # Overriding error function in order to display the help message
@@ -372,7 +378,8 @@ def scraper(html, batch, scrape_by, user, password, host, database):
                 link=links[set_number][art_number],
                 tags=tags[art_number],
                 date_published=times_published[art_number],
-                categories=categories[art_number]
+                categories=categories[art_number],
+                source='Coindesk'
             )
             if stop_condition(new_article, scrape_by):
                 insert_batch(articles, batch, host, user, password, database)

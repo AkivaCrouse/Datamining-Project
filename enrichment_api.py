@@ -27,5 +27,10 @@ def enrich_tag(tag, num_article, from_date=None, to_date=None, domains=None, sor
         if article['description'] is None:
             article['description'] = ''
         articles.append(Article(article['title'], article['description'], [article['author']], article['url'],
-                                [tag], datetime.strptime(article['publishedAt'], API_DATE_FORMAT), ['Enriched data']))
+                                [tag], datetime.strptime(article['publishedAt'], API_DATE_FORMAT), ['Enriched data'],
+                                article['source']['name']))
     return articles
+
+
+for a in enrich_tag('bitcoin',25):
+    print(a,'\n')
