@@ -90,6 +90,36 @@ def reset_database(user, password, host, database):
     sql_logger.info(f'Reset the database {database}.')
 
 
+def select_top_ten_tags(user, password, host, database):
+    """
+    present the database data
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    :return:
+    """
+    with pymysql.connect(host=host, user=user, password=password, database=database,
+                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+        with connection_instance.cursor() as cursor:
+            query = """
+                    SELECT tags.name, COUNT(DISTINCT article_id) as tag_count
+                    FROM tags
+                    INNER JOIN tags_in_articles ON tags_in_articles.tag_id = tags.id
+                    INNER JOIN articles ON articles.id = tags_in_articles.article_id
+                    WHERE articles.source = 'Coindesk'
+                    GROUP BY tags.name
+                    ORDER BY tag_count DESC
+                    LIMIT 10
+                    """
+
+            cursor.execute(query)
+            results = cursor.fetchall()
+            return pd.DataFrame(results)
+
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--username', help='username of mysql', default=USER)
@@ -100,6 +130,7 @@ def main():
     parser.add_argument('--print', help='Show the created DB and its tables', action='store_true')
     parser.add_argument('--delete', help='Clean database for tests', action='store_true')
     parser.add_argument('--reset', help='Reset database for tests', action='store_true')
+    parser.add_argument('--top10', help='Prints the 10 most common tags', action='store_true')
     args = parser.parse_args()
     try:
         initialize_database(args.username, args.password, args.host, args.database)
@@ -109,6 +140,8 @@ def main():
             show_and_describe_tables(args.username, args.password, args.host, args.database)
         if args.delete:
             drop_database(args.username, args.password, args.host, args.database)
+        if args.top10:
+            print(select_top_ten_tags(args.username, args.password, args.host, args.database))
     except pymysql.err.Error as err:
         sql_logger.error(err.args)
         print(err.args)
