@@ -1,3 +1,4 @@
+import grequests
 import requests
 import json
 from datetime import datetime
@@ -20,10 +21,10 @@ def enrich_tag(tag, num_article, from_date=None, to_date=None, domains=None, sor
     url = f'https://newsapi.org/v2/everything?q={tag}&language=en&excludeDomains=coindesk.com&apiKey={API_KEY}' \
           f'{sort_by_str}{from_date_str}{to_date_str}{domains_str}'
     response = requests.get(url)
-    response_json = json.loads(response.json())
+    response_json = response.json()
     articles = []
     for article in response_json['articles']:
         articles.append(Article(article['title'], article['description'], article['author'], article['url'],
-                                tag, datetime.strptime(article['publishedAt'], PUBLISHED_DATE_FORMAT), 'Enriched data'))
+                                tag, datetime.strptime(article['publishedAt'], API_DATE_FORMAT), 'Enriched data'))
 
     return articles

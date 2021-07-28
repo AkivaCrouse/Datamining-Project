@@ -1,7 +1,9 @@
 import logging
 
-# news_api key
+# news_api constants
 API_KEY = 'fece1de5cfde4f2d9d004ae04dcf8217'
+API_DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+# 2021-07-28T11:30:00Z
 
 # logging defaults
 COIN_DESK_LOG_FILE = 'coindesk.log'
