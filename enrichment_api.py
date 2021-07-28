@@ -5,7 +5,7 @@ from config import *
 from Coindesk_Scraper import Article
 
 
-def enrich_tag(tag, num_article, from_date=None, to_date=None, domains=None, sort_by='publishedAt'):
+def enrich_tag(tag, num_article=100, from_date=None, to_date=None, domains=None, sort_by='publishedAt'):
     from_date_str = ''
     to_date_str = ''
     domains_str = ''
@@ -30,7 +30,3 @@ def enrich_tag(tag, num_article, from_date=None, to_date=None, domains=None, sor
                                 [tag], datetime.strptime(article['publishedAt'], API_DATE_FORMAT), ['Enriched data'],
                                 article['source']['name']))
     return articles
-
-
-for a in enrich_tag('bitcoin',25):
-    print(a,'\n')

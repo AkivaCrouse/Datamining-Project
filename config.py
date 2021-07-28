@@ -46,7 +46,7 @@ CATEGORIES_ARTICLES_TABLE = 'Categories_in_articles'
 CREATE_DATABASE = 'CREATE DATABASE IF NOT EXISTS '
 USE_DATABASE = 'USE '
 AUTHORS_CREATION = f"""CREATE TABLE IF NOT EXISTS {AUTHORS_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) UNIQUE
+            name VARCHAR(400) UNIQUE
             )
             """
 SUMMARIES_CREATION = f"""CREATE TABLE IF NOT EXISTS {SUMMARIES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
@@ -62,7 +62,7 @@ TAGS_CREATION = f"""CREATE TABLE IF NOT EXISTS {TAGS_TABLE} (id INT AUTO_INCREME
             )
             """
 ARTICLES_CREATION = f"""CREATE TABLE IF NOT EXISTS {ARTICLES_TABLE} (id INT AUTO_INCREMENT PRIMARY KEY,
-            title varchar(200),
+            title varchar(400),
             publication_date TIMESTAMP,
             url VARCHAR(300) UNIQUE,
             summary_id INT UNIQUE NOT NULL,
@@ -93,7 +93,6 @@ CATEGORIES_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATE
             """
 
 
-
 # SQL INSERT scripts
 INSERT_INTO_SUMMARIES = f'''INSERT INTO {SUMMARIES_TABLE} (summary) VALUES (%s)'''
 INSERT_INTO_ARTICLES = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url,source)
@@ -107,6 +106,18 @@ INSERT_INTO_RELATIONSHIP_ARTICLE_TAG = f'INSERT INTO {TAGS_ARTICLES_TABLE} VALUE
 FIND_CATEGORY = f'SELECT id FROM {CATEGORIES_TABLE} WHERE category = %s'
 INSERT_INTO_CATEGORY = f'INSERT INTO {CATEGORIES_TABLE} (category) VALUES (%s)'
 INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY = f'INSERT INTO {CATEGORIES_ARTICLES_TABLE} VALUES (%s, %s)'
+
+
+# SQL QUERY scripts
+TOP_TEN_TAGS = f"""
+                    SELECT {TAGS_TABLE}.name as tag, COUNT(DISTINCT article_id) as tag_count
+                    FROM {TAGS_TABLE} INNER JOIN {TAGS_ARTICLES_TABLE} ON {TAGS_ARTICLES_TABLE}.tag_id = {TAGS_TABLE}.id
+                    INNER JOIN {ARTICLES_TABLE} ON {ARTICLES_TABLE}.id = {TAGS_ARTICLES_TABLE}.article_id
+                    WHERE {ARTICLES_TABLE}.source = 'Coindesk'
+                    GROUP BY {TAGS_TABLE}.name
+                    ORDER BY tag_count DESC
+                    LIMIT 10
+                    """
 
 
 # Table field names

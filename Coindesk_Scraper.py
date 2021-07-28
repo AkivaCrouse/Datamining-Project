@@ -18,6 +18,7 @@ import datetime
 import pymysql
 import selenium.common.exceptions
 
+import enrichment_api
 from config import *
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -529,6 +530,34 @@ def insert_data(article, conn):
         return False
 
 
+def select_top_ten_tags(user, password, host, database):
+    """
+    Retrieves the ten most popular tags and returns a dataframe.
+    :param user: username of mysql
+    :param password: password of mysql
+    :param host: url of database server
+    :param database: database to save to
+    :return: dataframe of 10 most popular tags and their respective tag counts.
+    """
+    with pymysql.connect(host=host, user=user, password=password, database=database,
+                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+        with connection_instance.cursor() as cursor:
+            cursor.execute(TOP_TEN_TAGS)
+            results = cursor.fetchall()
+            return pd.DataFrame(results)
+
+
+def enrich_tags(batch_size, user, password, host, database):
+    df = select_top_ten_tags(user, password, host, database)
+    for tag in df.tag:
+        print('Enriching', tag, 'tag:')
+        articles = enrichment_api.enrich_tag(tag)
+        for a in articles:
+            print(a, '\n')
+
+        insert_batch(articles, batch_size, host, user, password, database)
+
+
 def main():
     """Receives Coindesk topic category and number of articles to print as command parameters.
     Uses selenium to retrieve the required html script.
@@ -539,6 +568,7 @@ def main():
     html = get_html(URL + category, scrap_by)
     scraper(html, BATCH, scrap_by, username, password, host, database)
     after = time.time()
+    # enrich_tags(10, username, password, host, database)
     print(f"\nScraping took {round(after - before, 3)} seconds.")
 
 
