@@ -6,10 +6,13 @@ API_KEY = 'fece1de5cfde4f2d9d004ae04dcf8217'
 # logging defaults
 COIN_DESK_LOG_FILE = 'coindesk.log'
 SQL_LOG_FILE = 'sql.log'
+ENRICHMENT_API_LOG_FILE = 'enrichment_api.log'
 coin_logger = logging.getLogger('articles')
 coin_logger.setLevel(logging.INFO)
 sql_logger = logging.getLogger('database-creation')
 sql_logger.setLevel(logging.INFO)
+enrichment_logger = logging.getLogger('enrich-api')
+enrichment_logger.setLevel(logging.INFO)
 formatter = logging.Formatter(
     '%(asctime)s-%(levelname)s-FILE:%(filename)s-FUNC:%(funcName)s-LINE:%(lineno)d-%(message)s')
 
@@ -25,6 +28,11 @@ file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 sql_logger.addHandler(file_handler)
 
+# Enrichment Logger for log file
+file_handler = logging.FileHandler(ENRICHMENT_API_LOG_FILE)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+enrichment_logger.addHandler(file_handler)
 
 # SQL defaults
 HOST = 'localhost'
@@ -90,7 +98,6 @@ CATEGORIES_ARTICLES_RELATIONSHIP_CREATION = f"""CREATE TABLE IF NOT EXISTS {CATE
             )
             """
 
-
 # SQL INSERT scripts
 INSERT_INTO_SUMMARIES = f'''INSERT INTO {SUMMARIES_TABLE} (summary) VALUES (%s)'''
 INSERT_INTO_ARTICLES = f'''INSERT INTO {ARTICLES_TABLE} (title,summary_id,publication_date,url,source)
@@ -105,7 +112,6 @@ FIND_CATEGORY = f'SELECT id FROM {CATEGORIES_TABLE} WHERE category = %s'
 INSERT_INTO_CATEGORY = f'INSERT INTO {CATEGORIES_TABLE} (category) VALUES (%s)'
 INSERT_INTO_RELATIONSHIP_ARTICLE_CATEGORY = f'INSERT INTO {CATEGORIES_ARTICLES_TABLE} VALUES (%s, %s)'
 
-
 # SQL QUERY scripts
 TOP_TEN_TAGS = f"""
                     SELECT {TAGS_TABLE}.name as tag, COUNT(DISTINCT article_id) as tag_count
@@ -116,7 +122,6 @@ TOP_TEN_TAGS = f"""
                     ORDER BY tag_count DESC
                     LIMIT 10
                     """
-
 
 # Table field names
 AUTHOR_ID = 'id'
@@ -169,7 +174,8 @@ SCRAPE_BY_PARAMETERS = 'parameters'
 NUM_SCRAPE_TYPE = 'num'
 DATE_SCRAPE_TYPE = 'date'
 
-# Enrichment json constants
+# Enrichment api constants
+SORT_BY_OPTIONS = ['publishedAt', 'popularity', 'relevancy']
 API_DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 ENRICHMENT_ARTICLES = 'articles'
 ENRICHMENT_AUTHOR = 'author'
