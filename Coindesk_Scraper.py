@@ -563,19 +563,35 @@ def select_top_ten_tags(user, password, host, database):
     :param database: database to save to
     :return: dataframe of 10 most popular tags and their respective tag counts.
     """
-    with pymysql.connect(host=host, user=user, password=password, database=database,
-                         cursorclass=pymysql.cursors.DictCursor) as connection_instance:
-        with connection_instance.cursor() as cursor:
-            cursor.execute(TOP_TEN_TAGS)
-            results = cursor.fetchall()
-            return pd.DataFrame(results)
+    try:
+        with pymysql.connect(host=host, user=user, password=password, database=database,
+                             cursorclass=pymysql.cursors.DictCursor) as connection_instance:
+            with connection_instance.cursor() as cursor:
+                cursor.execute(TOP_TEN_TAGS)
+                results = cursor.fetchall()
+                return pd.DataFrame(results)
+    except pymysql.err.Error as err:
+        print(err.args)
+        coin_logger.error(err.args)
+        exit(1)
 
 
 def enrich_tags(batch_size, user, password, host, database):
+    """
+    enriches the database with articles from different sources that share a
+    tag from the top ten tags in the database currently
+    :param batch_size: batch size of article to insert to database
+    :param user: user for database
+    :param password: password for database
+    :param host: host url of database
+    :param database: database name
+    :return:
+    """
     df = select_top_ten_tags(user, password, host, database)
     for tag in df.tag:
         print('Enriching', tag, 'tag:')
         articles = enrichment_api.enrich_tag(tag)
+        coin_logger.info(f'Enriched tag {tag}')
         for a in articles:
             print(a, '\n')
 
