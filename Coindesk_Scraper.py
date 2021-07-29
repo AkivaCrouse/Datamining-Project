@@ -237,7 +237,6 @@ def handle_args_num_and_date(parser, args):
 
     Parameters
     ----------
-    date: Datetime: User input
     parser: The parser for messaging errors
     args: arguments given by the user
 
@@ -252,7 +251,7 @@ def handle_args_num_and_date(parser, args):
         scrape_config[SCRAPE_BY_FUNCTION] = by_number_of_articles
         scrape_config[SCRAPE_BY_PARAMETERS] = int(args.num)
 
-    elif args.date is not None:
+    if args.date is not None:
         now = datetime.today()
         if args.date > now:
             parser.error("The date is the future, please enter another date")
