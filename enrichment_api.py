@@ -25,17 +25,22 @@ def validate_params(num_article, from_date=None, to_date=None, domains=None, sor
     if num_article > 100 or num_article <= 0:
         raise ValueError('Free usage of news api needs a number between 1 - 100')
     try:
-        datetime.strptime(from_date, PUBLISHED_DATE_FORMAT)
-        datetime.strptime(to_date, PUBLISHED_DATE_FORMAT)
-    except ValueError:
-        raise ValueError(f"Incorrect data format, should be {PUBLISHED_DATE_FORMAT}")
-    if from_date is not None:
-        from_date_str = f'&from={from_date}'
-    if to_date is not None:
-        to_date_str = f'&to={to_date}'
-    if domains is not None:
-        domains_str = f'&domains={",".join(domains)}'
-    return num_article, from_date_str, to_date_str, domains_str, sort_by_str
+        if from_date is not None:
+            datetime.strptime(from_date, PUBLISHED_DATE_FORMAT)
+            from_date_str = f'&from={from_date}'
+        if to_date is not None:
+            datetime.strptime(to_date, PUBLISHED_DATE_FORMAT)
+            to_date_str = f'&to={to_date}'
+        if domains is not None:
+            if isinstance(domains, list) and all(isinstance(item, str) for item in domains):
+                domains_str = f'&domains={",".join(domains)}'
+            else:
+                raise ValueError('domains must be a list of strings')
+        return num_article, from_date_str, to_date_str, domains_str, sort_by_str
+    except ValueError as ve:
+        print(ve.args)
+        enrichment_logger.error(ve.args)
+        exit(1)
 
 
 def enrich_tag(tag, num_article=100, from_date=None, to_date=None, domains=None, sort_by='publishedAt'):
