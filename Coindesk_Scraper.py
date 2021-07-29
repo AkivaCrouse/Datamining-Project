@@ -591,7 +591,7 @@ def main():
     scraper(html, BATCH, scrap_by, username, password, host, database)
     after = time.time()
     if enrich:
-        enrich_tags(10, username, password, host, database)
+        enrich_tags(BATCH_SIZE_ENRICH, username, password, host, database)
     print(f"\nScraping took {round(after - before, 3)} seconds.")
 
 

@@ -175,6 +175,7 @@ NUM_SCRAPE_TYPE = 'num'
 DATE_SCRAPE_TYPE = 'date'
 
 # Enrichment api constants
+BATCH_SIZE_ENRICH = 10
 SORT_BY_OPTIONS = ['publishedAt', 'popularity', 'relevancy']
 API_DATE_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 ENRICHMENT_ARTICLES = 'articles'

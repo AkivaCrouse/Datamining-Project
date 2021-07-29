@@ -72,7 +72,7 @@ def enrich_tag(tag, num_article=100, from_date=None, to_date=None, domains=None,
             if article[ENRICHMENT_DESCRIPTION] is None:
                 article[ENRICHMENT_DESCRIPTION] = ''
             articles.append(Article(article[ENRICHMENT_TITLE], article[ENRICHMENT_DESCRIPTION],
-                                    [article[ENRICHMENT_AUTHOR]], article[ENRICHMENT_URL], [tag],
+                                    list(article[ENRICHMENT_AUTHOR].split('\n')), article[ENRICHMENT_URL], [tag],
                                     datetime.strptime(article[ENRICHMENT_PUBLISH_DATE], API_DATE_FORMAT),
                                     [ENRICHMENT_CATEGORY], article[ENRICHMENT_SOURCE][ENRICHMENT_SOURCE_NAME]))
         return articles
