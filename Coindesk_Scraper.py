@@ -320,7 +320,9 @@ def get_html(url, scrape_by):
     :param scrape_by: dictionary that details how to scrape
     :return: the page source code as html
     """
-    browser = webdriver.Chrome()
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.headless = True
+    browser = webdriver.Chrome(PATH, options=chrome_options)
     try:
         browser.get(url)
         scrape_by[SCRAPE_BY_FUNCTION](scrape_by[SCRAPE_BY_PARAMETERS], browser)

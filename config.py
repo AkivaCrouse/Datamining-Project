@@ -129,6 +129,7 @@ TAG_ID = 'id'
 CATEGORY_ID = 'id'
 
 # PATH = "C:\Program Files (x86)\chromedriver.exe"
+PATH = '/home/roni/PycharmProjects/Datamining-Project/chromedriver'
 ARTICLE_LINK_INDEX = 1
 BATCH_SIZE = 10
 URL = "https://www.coindesk.com"
